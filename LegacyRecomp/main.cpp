@@ -159,7 +159,7 @@ uint32_t LdrLoadModule(const std::filesystem::path &path)
     auto resourcesCount = (res->sizeOfHeader - 4) / sizeof(Xex_ResourceInfo);
     auto resBlockSize = resourcesCount * sizeof(Xex_ResourceInfo) + 4;
     memcpy(&global_resource_info, res, resBlockSize);
-    //g_xdbfWrapper = XDBFWrapper((uint8_t*)g_memory.Translate(global_resource_info.resources[1].offset.get()), global_resource_info.resources[1].sizeOfData);
+    g_xdbfWrapper = XDBFWrapper((uint8_t*)g_memory.Translate(global_resource_info.resources[1].offset.get()), global_resource_info.resources[1].sizeOfData);
 
 
     return entry;

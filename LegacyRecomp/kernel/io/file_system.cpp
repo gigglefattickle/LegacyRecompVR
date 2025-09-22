@@ -89,11 +89,9 @@ FileHandle* XCreateFileA
     uint32_t dwFlagsAndAttributes
 )
 {
-
-    DebugBreak();
     assert(((dwDesiredAccess & ~(GENERIC_READ | GENERIC_WRITE | FILE_READ_DATA)) == 0) && "Unknown desired access bits.");
     assert(((dwShareMode & ~(FILE_SHARE_READ | FILE_SHARE_WRITE)) == 0) && "Unknown share mode bits.");
-    assert(((dwCreationDisposition & ~(CREATE_NEW | CREATE_ALWAYS)) == 0) && "Unknown creation disposition bits.");
+    assert(((dwCreationDisposition & ~(CREATE_NEW | CREATE_ALWAYS | OPEN_ALWAYS)) == 0) && "Unknown creation disposition bits.");
 
     std::filesystem::path filePath = FileSystem::ResolvePath(lpFileName, true);
     std::fstream fileStream;
@@ -108,6 +106,13 @@ FileHandle* XCreateFileA
         fileOpenMode |= std::ios::out;
     }
 
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+
+    std::filesystem::path exePath(path);
+   
+    printf("Opening file: %s\n", filePath.string().c_str());
+   
     fileStream.open(filePath, fileOpenMode);
     if (!fileStream.is_open())
     {
@@ -125,7 +130,6 @@ FileHandle* XCreateFileA
 
 static uint32_t XGetFileSizeA(FileHandle* hFile, be<uint32_t>* lpFileSizeHigh)
 {
-    DebugBreak();
     std::error_code ec;
     auto fileSize = std::filesystem::file_size(hFile->path, ec);
     if (!ec)
@@ -168,7 +172,6 @@ uint32_t XReadFile
     XOVERLAPPED* lpOverlapped
 )
 {
-    DebugBreak();
     uint32_t result = FALSE;
     if (lpOverlapped != nullptr)
     {

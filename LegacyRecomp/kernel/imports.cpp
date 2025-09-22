@@ -1492,7 +1492,7 @@ uint32_t NtReleaseSemaphore(Semaphore* Handle, uint32_t ReleaseCount, int32_t* P
 
 void NtWaitForMultipleObjectsEx()
 {
-    LOG_UTILITY("!!! STUB !!!");
+    //LOG_UTILITY("!!! STUB !!!");
 }
 
 void RtlCompareStringN()
@@ -1638,6 +1638,26 @@ void NetDll_XNetStartup()
     LOG_UTILITY("!!! STUB !!!");
 }
 
+struct X_INPUT_KEYSTROKE {
+    be<uint16_t> virtual_key;
+    be<uint16_t> unicode;
+    be<uint16_t> flags;
+    uint8_t user_index;
+    uint8_t hid_code;
+};
+
+
+uint32_t XamInputGetKeystrokeEx(uint32_t* user_index_ptr, uint32_t flags, X_INPUT_KEYSTROKE* keystroke)
+{
+    printf("XamInputGetKeystrokeEx: user_index:%d flags:%d keystroke %d\n", user_index_ptr, flags, keystroke);
+
+    return 0;
+}
+
+GUEST_FUNCTION_HOOK(__imp__XamInputGetKeystrokeEx, XamInputGetKeystrokeEx);
+
+
+
 void NetDll_XNetGetTitleXnAddr()
 {
     LOG_UTILITY("!!! STUB !!!");
@@ -1696,10 +1716,13 @@ uint32_t KeReleaseSemaphore(XKSEMAPHORE* semaphore, uint32_t increment, uint32_t
     return STATUS_SUCCESS;
 }
 
-void XAudioGetVoiceCategoryVolume()
+uint32_t XAudioGetVoiceCategoryVolume(uint32_t unk, be<float>* out_ptr)
 {
-    LOG_UTILITY("!!! STUB !!!");
+    //LOG_UTILITY("!!! STUB !!!");
+    *out_ptr = 1.0f;
+    return 0;
 }
+
 
 uint32_t XAudioGetVoiceCategoryVolumeChangeMask(uint32_t Driver, be<uint32_t>* Mask)
 {
@@ -1971,7 +1994,6 @@ GUEST_FUNCTION_STUB_P(__imp__XamUserCreateAchievementEnumerator);
 GUEST_FUNCTION_STUB_P(__imp__XamUserGetXUID);
 GUEST_FUNCTION_STUB_P(__imp__XamWriteGamerTile);
 GUEST_FUNCTION_STUB_P(__imp__XamGetCurrentTitleId);
-GUEST_FUNCTION_STUB_P(__imp__XamInputGetKeystrokeEx);
 GUEST_FUNCTION_STUB_P(__imp__XamShowFriendsUI);
 GUEST_FUNCTION_STUB_P(__imp__XamShowGameVoiceChannelUI);
 GUEST_FUNCTION_STUB_P(__imp__XamShowGoldUpgradeUI);

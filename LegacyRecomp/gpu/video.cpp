@@ -2109,21 +2109,35 @@ void Video::WaitForGPU()
 
 static uint32_t CreateDevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, be<uint32_t>* a6)
 {
-    g_xdbfTextureCache = std::unordered_map<uint16_t, GuestTexture *>();
+    //g_xdbfTextureCache = std::unordered_map<uint16_t, GuestTexture *>();
 
-    for (auto &achievement : g_xdbfWrapper.GetAchievements(XDBF_LANGUAGE_ENGLISH))
-    {
-        // huh?
-        if (!achievement.pImageBuffer || !achievement.ImageBufferSize)
-            continue;
 
-        g_xdbfTextureCache[achievement.ID] =
-            LoadTexture((uint8_t *)achievement.pImageBuffer, achievement.ImageBufferSize).release();
+    
+    // 
+    // 
+    // TODO, take inspiration and also load our achievement icons from the XDBF.
+    // 
+    //for (auto &achievement : g_xdbfWrapper.GetAchievements(XDBF_LANGUAGE_ENGLISH))
+    //{
+    //    // huh?
+    //    if (!achievement.pImageBuffer || !achievement.ImageBufferSize)
+    //        continue;
+    //
+    //    g_xdbfTextureCache[achievement.ID] =
+    //        LoadTexture((uint8_t *)achievement.pImageBuffer, achievement.ImageBufferSize).release();
+    //}
+
+
+    //
+    //  minecraft calls CreateDevice twice, i'm not sure why.
+    //  but i'll allocate the backBuffer once, it may cause issues, but we'll see
+    //  TODO: figure out why it calls it twice
+
+    if (g_backBuffer == nullptr) {
+        // Move backbuffer to guest memory.
+        assert(!g_memory.IsInMemoryRange(g_backBuffer) && g_backBufferHolder != nullptr);
+        g_backBuffer = g_userHeap.AllocPhysical<GuestSurface>(std::move(*g_backBufferHolder));
     }
-
-    // Move backbuffer to guest memory.
-    assert(!g_memory.IsInMemoryRange(g_backBuffer) && g_backBufferHolder != nullptr);
-    g_backBuffer = g_userHeap.AllocPhysical<GuestSurface>(std::move(*g_backBufferHolder));
 
     // Check for stale reference. BeginCommandList() gets called before CreateDevice() which is where the assignment happens.
     if (g_renderTarget == g_backBufferHolder.get()) g_renderTarget = g_backBuffer;
@@ -2157,6 +2171,17 @@ static uint32_t CreateDevice(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
     device->viewport.maxZ = 1.0f;
 
     *a6 = g_memory.MapVirtual(device);
+
+
+    // 822f51e0
+    // just to make this happy, it's some D3DDevice field, idk what tho, so maybe reverse it later
+    //uint32_t flags = 0xa5800000;
+    //uint32_t size = 0x80;
+    //auto magic_addrIDK = g_userHeap.AllocPhysical(size, (1ull << ((flags >> 24) & 0xF)));
+    //if (magic_addrIDK != 0) {
+    //    *reinterpret_cast<uint32_t*>(g_memoryg.Translate(*a6 + 0x2b10)) = (uint32_t)magic_addrIDK;
+    //    memset(magic_addrIDK, 0, size);
+    //}
 
     return 0;
 }
@@ -5093,7 +5118,7 @@ static GuestShader* CreateShader(const be<uint32_t>* function, ResourceType reso
             shader = g_userHeap.AllocPhysical<GuestShader>(resourceType);
 
             if (hash == 0x85ED723035ECF535)
-                shader->shader = CREATE_SHADER(blend_color_alpha_ps);
+                shader->shader = g_device->createShader(g_vulkan ? g_blend_color_alpha_ps_spirv : g_blend_color_alpha_ps_dxil, g_vulkan ? sizeof(g_blend_color_alpha_ps_spirv) : sizeof(g_blend_color_alpha_ps_dxil), "main", g_vulkan ? RenderShaderFormat::SPIRV : RenderShaderFormat::DXIL);
             else if (hash == 0xB1086A4947A797DE)
                 shader->shader = CREATE_SHADER(csd_no_tex_vs);
             else if (hash == 0xB4CAFC034A37C8A8)
@@ -7289,93 +7314,176 @@ static void ConvertToDegenerateTriangles(uint16_t* indices, uint32_t indexCount,
 //        g_userHeap.Free(newIndices);
 //}
 
+struct X_ID3DXBuffer 
+{
+    virtual void QueryInterface(PPCContext& __restrict ctx, uint8_t* base) = 0;
+    virtual void AddRef(PPCContext& __restrict ctx, uint8_t* base) = 0;
+    virtual void Release(PPCContext& __restrict ctx, uint8_t* base) = 0;
+
+    virtual void GetBufferPointer(PPCContext& __restrict ctx, uint8_t* base) = 0;
+    virtual void GetBufferSize(PPCContext& __restrict ctx, uint8_t* base) = 0;
+
+    uint32_t refCount;
+    uint32_t bufferSize;
+    uint32_t* buffer;
+};
+
+uint32_t* imp_GetBufferPointer(X_ID3DXBuffer* _this)
+{
+    return _this->buffer;
+}
+
+GUEST_FUNCTION_HOOK(GetBufferPointer, imp_GetBufferPointer);
+
+uint32_t D3DXCompileShader(uint8_t* shaderCode, uint32_t len, uint32_t defines, uint32_t include, uint8_t* functionName, uint8_t* profile, uint32_t flags, be<uint32_t>* outCode, be<uint32_t>* outErrors, be<uint32_t>* outConstantTable)
+{
+    printf("%s\n", shaderCode);
+    printf("%d\n", len);
+    printf("%s\n", functionName);
+    printf("%s\n", profile);
+    //void *b uff = g_userHeap.Alloc(sizeof(X_ID3DXBuffer);
+    //outCode = static_cast<be<uint32_t>*>(g_userHeap.Alloc(sizeof(X_ID3DXBuffer)));
+    DebugBreak();
+
+    
+    return 0;
+}
+
+//GUEST_FUNCTION_HOOK(sub_826D1A10, D3DXCompileShader);
+GUEST_FUNCTION_HOOK(sub_822E4CB0, CreateDevice);
 
 
 
 
+// known TU2 functions
+// CreateVertexShader
+// CreatePixelShader
+// D3DXCompileShader
+// SetPixelShader
+// ...
 
-GUEST_FUNCTION_HOOK(sub_82BD99B0, CreateDevice);
 
-GUEST_FUNCTION_HOOK(sub_82BE6230, DestructResource);
+GUEST_FUNCTION_STUB(sub_824E1800); // draw
+GUEST_FUNCTION_STUB(sub_822E70D8); // CDevice::KickOff // temp stub until i implement BeginCommandBuffer 
+GUEST_FUNCTION_STUB(sub_82217888);
+GUEST_FUNCTION_STUB(sub_824E1860); // endlist
+GUEST_FUNCTION_STUB(sub_8246FB68); // idk
+GUEST_FUNCTION_STUB(sub_824E1790); // idk
+GUEST_FUNCTION_STUB(sub_8228AB18); // idk
+GUEST_FUNCTION_STUB(sub_8225D8A8); // idk
+GUEST_FUNCTION_STUB(sub_8228C6B0); // idk
 
-GUEST_FUNCTION_HOOK(sub_82BE9300, LockTextureRect);
-GUEST_FUNCTION_HOOK(sub_82BE7780, UnlockTextureRect);
 
-GUEST_FUNCTION_HOOK(sub_82BE6B98, LockVertexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE6BE8, UnlockVertexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE61D0, GetVertexBufferDesc);
 
-GUEST_FUNCTION_HOOK(sub_82BE6CA8, LockIndexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE6CF0, UnlockIndexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE6200, GetIndexBufferDesc);
 
-GUEST_FUNCTION_HOOK(sub_82BE96F0, GetSurfaceDesc);
+PPC_FUNC_IMPL(__imp__sub_82707C20);
+PPC_FUNC(sub_82707C20)
+{
+    // Just return null, we don't need to load jpgs.
+    ctx.r3.u64 = -1;
+}
 
-GUEST_FUNCTION_HOOK(sub_82BE04B0, GetVertexDeclaration);
-GUEST_FUNCTION_HOOK(sub_82BE0530, HashVertexDeclaration);
+PPC_FUNC_IMPL(__imp__sub_82309878);
+PPC_FUNC(sub_82309878)
+{
+   
+    __imp__sub_82309878(ctx, base);
+}
+//GUEST_FUNCTION_STUB(sub_82707C20); // LoadJPG
 
-GUEST_FUNCTION_HOOK(sub_82BDA8C0, Video::Present);
-GUEST_FUNCTION_HOOK(sub_82BDD330, GetBackBuffer);
 
-GUEST_FUNCTION_HOOK(sub_82BE9498, CreateTexture);
-GUEST_FUNCTION_HOOK(sub_82BE6AD0, CreateVertexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE6BF8, CreateIndexBuffer);
-GUEST_FUNCTION_HOOK(sub_82BE95B8, CreateSurface);
 
-GUEST_FUNCTION_HOOK(sub_82BF6400, StretchRect);
+GUEST_FUNCTION_HOOK(sub_822D14D8, SetRenderTarget);
+GUEST_FUNCTION_HOOK(sub_822D1868, SetDepthStencilSurface);
 
-GUEST_FUNCTION_HOOK(sub_82BDD9F0, SetRenderTarget);
-GUEST_FUNCTION_HOOK(sub_82BDDD38, SetDepthStencilSurface);
 
-GUEST_FUNCTION_HOOK(sub_82BFE4C8, Clear);
 
-GUEST_FUNCTION_HOOK(sub_82BDD8C0, SetViewport);
+//sonic
+//GUEST_FUNCTION_HOOK(sub_82BD99B0, CreateDevice);
 
-GUEST_FUNCTION_HOOK(sub_82BE9818, SetTexture);
-GUEST_FUNCTION_HOOK(sub_82BDCFB0, SetScissorRect);
+//GUEST_FUNCTION_HOOK(sub_82BE6230, DestructResource);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE9300, LockTextureRect);
+//GUEST_FUNCTION_HOOK(sub_82BE7780, UnlockTextureRect);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE6B98, LockVertexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE6BE8, UnlockVertexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE61D0, GetVertexBufferDesc);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE6CA8, LockIndexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE6CF0, UnlockIndexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE6200, GetIndexBufferDesc);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE96F0, GetSurfaceDesc);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE04B0, GetVertexDeclaration);
+//GUEST_FUNCTION_HOOK(sub_82BE0530, HashVertexDeclaration);
+//
+//GUEST_FUNCTION_HOOK(sub_82BDA8C0, Video::Present);
+//GUEST_FUNCTION_HOOK(sub_82BDD330, GetBackBuffer);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE9498, CreateTexture);
+//GUEST_FUNCTION_HOOK(sub_82BE6AD0, CreateVertexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE6BF8, CreateIndexBuffer);
+//GUEST_FUNCTION_HOOK(sub_82BE95B8, CreateSurface);
+//
+//GUEST_FUNCTION_HOOK(sub_82BF6400, StretchRect);
+// 
+//GUEST_FUNCTION_HOOK(sub_82BDD9F0, SetRenderTarget);
+//GUEST_FUNCTION_HOOK(sub_82BDDD38, SetDepthStencilSurface);
+//
+//GUEST_FUNCTION_HOOK(sub_82BFE4C8, Clear);
+//
+//GUEST_FUNCTION_HOOK(sub_82BDD8C0, SetViewport);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE9818, SetTexture);
+//GUEST_FUNCTION_HOOK(sub_82BDCFB0, SetScissorRect);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE5900, DrawPrimitive);
+//GUEST_FUNCTION_HOOK(sub_82BE5CF0, DrawIndexedPrimitive);
+//GUEST_FUNCTION_HOOK(sub_82BE52F8, DrawPrimitiveUP);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE0428, CreateVertexDeclaration);
+//GUEST_FUNCTION_HOOK(sub_82BE02E0, SetVertexDeclaration);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE1A80, CreateVertexShader);
+//GUEST_FUNCTION_HOOK(sub_82BE0110, SetVertexShader);
+//
+//GUEST_FUNCTION_HOOK(sub_82BDD0F8, SetStreamSource);
+//GUEST_FUNCTION_HOOK(sub_82BDD218, SetIndices);
+//
+//GUEST_FUNCTION_HOOK(sub_82BE1990, CreatePixelShader);
+//GUEST_FUNCTION_HOOK(sub_82BDFE58, SetPixelShader);
+//
+//GUEST_FUNCTION_HOOK(sub_82C003B8, D3DXFillTexture);
+//GUEST_FUNCTION_HOOK(sub_82C00910, D3DXFillVolumeTexture);
+//
+//GUEST_FUNCTION_HOOK(sub_82E43FC8, MakePictureData);
+//
+////GUEST_FUNCTION_HOOK(sub_82E9EE38, SetResolution);
+//
+//GUEST_FUNCTION_HOOK(sub_82AE2BF8, ScreenShaderInit);
+//
+//// This is a buggy function that recreates framebuffers
+//// if the inverse capture ratio is not 2.0, but the parameter
+//// is completely unused and not stored, so it ends up
+//// recreating framebuffers every single frame instead.
+//GUEST_FUNCTION_STUB(sub_82BAAD38);
+//
+//GUEST_FUNCTION_STUB(sub_822C15D8);
+//GUEST_FUNCTION_STUB(sub_822C1810);
+//GUEST_FUNCTION_STUB(sub_82BD97A8);
+//GUEST_FUNCTION_STUB(sub_82BD97E8);
+//GUEST_FUNCTION_STUB(sub_82BDD370); // SetGammaRamp
+//GUEST_FUNCTION_STUB(sub_82BE05B8);
+//GUEST_FUNCTION_STUB(sub_82BE9C98);
+//GUEST_FUNCTION_STUB(sub_82BEA308);
+//GUEST_FUNCTION_STUB(sub_82CD5D68);
+//GUEST_FUNCTION_STUB(sub_82BE9B28);
+//GUEST_FUNCTION_STUB(sub_82BEA018);
+//GUEST_FUNCTION_STUB(sub_82BEA7C0);
+//GUEST_FUNCTION_STUB(sub_82BFFF88); // D3DXFilterTexture
 
-GUEST_FUNCTION_HOOK(sub_82BE5900, DrawPrimitive);
-GUEST_FUNCTION_HOOK(sub_82BE5CF0, DrawIndexedPrimitive);
-GUEST_FUNCTION_HOOK(sub_82BE52F8, DrawPrimitiveUP);
 
-GUEST_FUNCTION_HOOK(sub_82BE0428, CreateVertexDeclaration);
-GUEST_FUNCTION_HOOK(sub_82BE02E0, SetVertexDeclaration);
-
-GUEST_FUNCTION_HOOK(sub_82BE1A80, CreateVertexShader);
-GUEST_FUNCTION_HOOK(sub_82BE0110, SetVertexShader);
-
-GUEST_FUNCTION_HOOK(sub_82BDD0F8, SetStreamSource);
-GUEST_FUNCTION_HOOK(sub_82BDD218, SetIndices);
-
-GUEST_FUNCTION_HOOK(sub_82BE1990, CreatePixelShader);
-GUEST_FUNCTION_HOOK(sub_82BDFE58, SetPixelShader);
-
-GUEST_FUNCTION_HOOK(sub_82C003B8, D3DXFillTexture);
-GUEST_FUNCTION_HOOK(sub_82C00910, D3DXFillVolumeTexture);
-
-GUEST_FUNCTION_HOOK(sub_82E43FC8, MakePictureData);
-
-//GUEST_FUNCTION_HOOK(sub_82E9EE38, SetResolution);
-
-GUEST_FUNCTION_HOOK(sub_82AE2BF8, ScreenShaderInit);
-
-// This is a buggy function that recreates framebuffers
-// if the inverse capture ratio is not 2.0, but the parameter
-// is completely unused and not stored, so it ends up
-// recreating framebuffers every single frame instead.
-GUEST_FUNCTION_STUB(sub_82BAAD38);
-
-GUEST_FUNCTION_STUB(sub_822C15D8);
-GUEST_FUNCTION_STUB(sub_822C1810);
-GUEST_FUNCTION_STUB(sub_82BD97A8);
-GUEST_FUNCTION_STUB(sub_82BD97E8);
-GUEST_FUNCTION_STUB(sub_82BDD370); // SetGammaRamp
-GUEST_FUNCTION_STUB(sub_82BE05B8);
-GUEST_FUNCTION_STUB(sub_82BE9C98);
-GUEST_FUNCTION_STUB(sub_82BEA308);
-GUEST_FUNCTION_STUB(sub_82CD5D68);
-GUEST_FUNCTION_STUB(sub_82BE9B28);
-GUEST_FUNCTION_STUB(sub_82BEA018);
-GUEST_FUNCTION_STUB(sub_82BEA7C0);
-GUEST_FUNCTION_STUB(sub_82BFFF88); // D3DXFilterTexture
-GUEST_FUNCTION_STUB(sub_82BD96D0);
+GUEST_FUNCTION_STUB(sub_822E4508); // D3DDevice_Release
+//GUEST_FUNCTION_STUB(sub_82BD96D0);

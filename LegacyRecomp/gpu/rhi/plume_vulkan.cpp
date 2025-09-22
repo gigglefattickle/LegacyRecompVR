@@ -2367,10 +2367,12 @@ namespace plume {
         assert(signalSemaphore != nullptr);
 
         VulkanCommandSemaphore *interfaceSemaphore = static_cast<VulkanCommandSemaphore *>(signalSemaphore);
-        VkResult res = vkAcquireNextImageKHR(commandQueue->device->vk, vk, UINT64_MAX, interfaceSemaphore->vk, VK_NULL_HANDLE, textureIndex);
-        if ((res != VK_SUCCESS) && (res != VK_SUBOPTIMAL_KHR)) {
-            return false;
-        }
+
+        // TODO fix
+        //VkResult res = vkAcquireNextImageKHR(commandQueue->device->vk, vk, UINT64_MAX, interfaceSemaphore->vk, VK_NULL_HANDLE, textureIndex);
+        //if ((res != VK_SUCCESS) && (res != VK_SUBOPTIMAL_KHR)) {
+        //    return false;
+        //}
 
         return true;
     }

@@ -180,7 +180,7 @@ bool XNotifyGetNext(uint32_t hNotification, uint32_t dwMsgFilter, be<uint32_t>* 
     }
     else
     {
-        if (listener.notifications.empty())
+//        if (listener.notifications.empty())
             return false;
 
         if (pdwId)
@@ -405,8 +405,8 @@ uint32_t XamInputGetState(uint32_t userIndex, uint32_t flags, XAMINPUT_STATE* st
 {
     memset(state, 0, sizeof(*state));
 
-    if (hid::IsInputAllowed())
-        hid::GetState(userIndex, state);
+ //   if (hid::IsInputAllowed())
+ //       hid::GetState(userIndex, state);
 
     auto keyboardState = SDL_GetKeyboardState(NULL);
 
