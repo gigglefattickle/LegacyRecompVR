@@ -254,6 +254,13 @@ void Video::EndQuestEyeFrame()
     g_questCameraUniformBridge.ClearEye();
 }
 
+#if defined(UNLEASHED_RECOMP_OPENXR)
+bool Video::GetQuestEyeFrameData(uint32_t eye, quest::EyeFrameData& frameData)
+{
+    return g_questOpenXR.GetEyeFrameData(eye, frameData);
+}
+#endif
+
 std::string Video::GetQuestCameraTracePath()
 {
     return g_questCameraUniformBridge.TracePath();
