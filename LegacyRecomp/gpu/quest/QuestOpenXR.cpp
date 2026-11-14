@@ -82,7 +82,10 @@ namespace quest
 
         m_lastError.clear();
         if (!InitializeLoaderAndInstance())
+        {
+            Shutdown();
             return false;
+        }
         if (!CreateVulkanInstance())
         {
             Shutdown();
@@ -516,10 +519,10 @@ namespace quest
         addBinding(m_aimPoseAction, "/user/hand/right/input/aim/pose");
         addBinding(m_gripPoseAction, "/user/hand/left/input/grip/pose");
         addBinding(m_gripPoseAction, "/user/hand/right/input/grip/pose");
-        addBinding(m_triggerAction, "/user/hand/left/input/trigger/value");
-        addBinding(m_triggerAction, "/user/hand/right/input/trigger/value");
-        addBinding(m_squeezeAction, "/user/hand/left/input/squeeze/value");
-        addBinding(m_squeezeAction, "/user/hand/right/input/squeeze/value");
+        addBinding(m_triggerAction, "/user/hand/left/input/trigger/click");
+        addBinding(m_triggerAction, "/user/hand/right/input/trigger/click");
+        addBinding(m_squeezeAction, "/user/hand/left/input/squeeze/click");
+        addBinding(m_squeezeAction, "/user/hand/right/input/squeeze/click");
         addBinding(m_primaryAction, "/user/hand/left/input/x/click");
         addBinding(m_primaryAction, "/user/hand/right/input/a/click");
         addBinding(m_secondaryAction, "/user/hand/left/input/y/click");
