@@ -1,5 +1,6 @@
 #include "video.h"
 #include "quest/QuestCameraUniformBridge.h"
+#include <algorithm>
 
 #include "imgui/imgui_common.h"
 #include "imgui/imgui_snapshot.h"
