@@ -23,3 +23,9 @@ The following static methods are exposed on `Video` in `gpu/video.h`:
 - `GetQuestCameraTracePath()` to retrieve the trace file path.
 
 The eye matrix must be converted by the XR caller into the exact matrix convention expected by the game's world shader. This API does not create an OpenXR session, acquire runtime swapchain images, or invoke the eye callbacks itself. Until a caller supplies the headset-derived left/right matrices, the eye override remains inactive. The camera register is intentionally unconfigured by default.
+
+## In-game export button
+
+Open the `Quest VR Tools` panel in the game's ImGui overlay and press `Export camera trace`. The bridge flushes the trace before copying it to `quest-camera-trace.txt` under SDL's external-storage directory (or the current working directory when SDL does not provide one). The full export path is shown in the panel and written to the application log. The trace file remains capped to limit storage use.
+
+The overlay currently uses the existing SDL/ImGui mouse input path. Quest Touch controller pointer/click input is not yet implemented, so the button is present in the rendered UI but is not yet guaranteed to be clickable with Quest controllers.
