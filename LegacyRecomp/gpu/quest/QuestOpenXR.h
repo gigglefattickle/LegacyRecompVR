@@ -87,7 +87,7 @@ namespace quest
         bool CreateEyeSwapchain(uint32_t eye, uint32_t width, uint32_t height);
         void DestroyActions();
         void UpdateActions(XrTime displayTime);
-        bool LocateActionPose(XrAction action, XrSpace space, XrSpace baseSpace, XrTime time, XrPosef& pose);
+        bool LocateActionPose(XrAction action, XrPath subactionPath, XrSpace space, XrSpace baseSpace, XrTime time, XrPosef& pose);
         bool SetError(const char* operation, XrResult result);
         bool SetVkError(const char* operation, VkResult result);
 
