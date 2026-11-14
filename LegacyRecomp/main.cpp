@@ -1,5 +1,7 @@
 #include <stdafx.h>
+#if defined(__x86_64__) || defined(__i386__)
 #include <cpuid.h>
+#endif
 #include <cpu/guest_thread.h>
 #include <gpu/video.h>
 #include <kernel/function.h>
@@ -230,9 +232,13 @@ int main(int argc, char *argv[])
 
     if (!useDefaultWorkingDirectory)
     {
-        // Set the current working directory to the executable's path.
+#ifdef __ANDROID__
+        // Android executes from an APK; use the app-private files directory.
+        os::process::SetWorkingDirectory(os::process::GetWorkingDirectory());
+#else
         std::error_code ec;
         std::filesystem::current_path(os::process::GetExecutablePath().parent_path(), ec);
+#endif
     }
 
     Config::Load();
