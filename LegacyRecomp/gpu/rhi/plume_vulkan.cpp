@@ -4398,6 +4398,14 @@ namespace plume {
         preferredPhysicalDevice = requiredPhysicalDevice;
         deviceCreateCallback = std::move(createDeviceCallback);
         ownsInstance = false;
+
+        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        appInfo.pApplicationName = "Legacy Recomp VR";
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.pEngineName = "Plume";
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.apiVersion = VK_API_VERSION_1_2;
+
         volkLoadInstance(instance);
 
         capabilities.shaderFormat = RenderShaderFormat::SPIRV;
