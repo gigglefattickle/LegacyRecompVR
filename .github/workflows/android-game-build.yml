@@ -58,13 +58,26 @@ jobs:
           "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
 
-      - name: Install manifest dependencies and configure Android
+      # Install the manifest before CMake so host tools have a stable,
+      # predictable location. In particular, DXC is an x64 host executable,
+      # not an Android ARM64 dependency.
+      - name: Install vcpkg dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install \
+            --triplet arm64-android \
+            --host-triplet x64-linux \
+            --x-manifest-root="$GITHUB_WORKSPACE" \
+            --x-install-root="$GITHUB_WORKSPACE/out/android-arm64/vcpkg_installed"
+
+      - name: Configure Android
         run: |
           cmake -S . -B out/android-arm64 -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
             -DVCPKG_TARGET_TRIPLET=arm64-android \
             -DVCPKG_HOST_TRIPLET=x64-linux \
+            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/out/android-arm64/vcpkg_installed" \
+            -DDIRECTX_DXC_TOOL="$GITHUB_WORKSPACE/out/android-arm64/vcpkg_installed/x64-linux/tools/directx-dxc/dxc" \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-26 \
             -DANDROID_STL=c++_static \
