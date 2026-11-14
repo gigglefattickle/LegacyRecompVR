@@ -1,6 +1,8 @@
 #include "video.h"
 #include "quest/QuestCameraUniformBridge.h"
 #include <algorithm>
+#include <filesystem>
+#include <system_error>
 
 #include "imgui/imgui_common.h"
 #include "imgui/imgui_snapshot.h"
@@ -248,6 +250,36 @@ void Video::EndQuestEyeFrame()
 std::string Video::GetQuestCameraTracePath()
 {
     return g_questCameraUniformBridge.TracePath();
+}
+
+std::string Video::ExportQuestCameraTrace()
+{
+    const std::string source = g_questCameraUniformBridge.TracePath();
+    g_questCameraUniformBridge.FlushTrace();
+    if (source.empty())
+        return {};
+
+    const char* externalPath = SDL_GetExternalStoragePath();
+    std::filesystem::path destinationRoot = externalPath
+        ? std::filesystem::path(externalPath)
+        : std::filesystem::current_path();
+    const std::filesystem::path destination = destinationRoot / "quest-camera-trace.txt";
+    std::error_code error;
+    if (std::filesystem::equivalent(std::filesystem::path(source), destination, error) && !error)
+        return destination.string();
+
+    error.clear();
+    std::filesystem::copy_file(source, destination,
+        std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Quest camera trace export failed (%s): %s",
+            destination.string().c_str(), error.message().c_str());
+        return {};
+    }
+    SDL_Log("Quest camera trace exported: %s", destination.string().c_str());
+    return destination.string();
 }
 
 
@@ -2655,6 +2687,24 @@ static void DrawImGui()
     ImGui::NewFrame();
 
     ResetImGuiCallbacks();
+
+    static std::string questTraceExportStatus;
+    if (ImGui::Begin("Quest VR Tools"))
+    {
+        ImGui::TextUnformatted("Camera trace collection");
+        ImGui::TextWrapped("Exports the latest shader constant trace for camera-register analysis.");
+        if (ImGui::Button("Export camera trace"))
+        {
+            questTraceExportStatus = Video::ExportQuestCameraTrace();
+            if (questTraceExportStatus.empty())
+                questTraceExportStatus = "Export failed. Check the application log.";
+        }
+        if (!questTraceExportStatus.empty())
+            ImGui::TextWrapped("%s", questTraceExportStatus.c_str());
+        else
+            ImGui::TextWrapped("Trace is saved automatically while the game runs.");
+    }
+    ImGui::End();
 
 #ifdef ASYNC_PSO_DEBUG
     if (ImGui::Begin("Async PSO Stats"))
