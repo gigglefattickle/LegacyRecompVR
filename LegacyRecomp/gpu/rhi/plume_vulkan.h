@@ -87,6 +87,7 @@ namespace plume {
         VulkanTexture() = default;
         VulkanTexture(VulkanDevice *device, VulkanPool *pool, const RenderTextureDesc &desc);
         VulkanTexture(VulkanDevice *device, VkImage image);
+        VulkanTexture(VulkanDevice *device, VkImage image, VkFormat format, uint32_t width, uint32_t height);
         ~VulkanTexture() override;
         void createImageView(VkFormat format);
         std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &desc) override;
