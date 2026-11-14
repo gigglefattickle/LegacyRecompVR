@@ -58,8 +58,10 @@ else()
     add_compile_options(-ffp-model=strict)
 endif()
 
+if (NOT ANDROID)
+    add_compile_definitions(SDL_MAIN_HANDLED)
+endif()
 add_compile_definitions(
-    SDL_MAIN_HANDLED
     _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR # Microsoft wtf?
     _CRT_SECURE_NO_WARNINGS)
 
@@ -93,6 +95,14 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
         "os/linux/process_linux.cpp"
         "os/linux/user_linux.cpp"
         "os/linux/version_linux.cpp"
+    )
+elseif (ANDROID)
+    set(UNLEASHED_RECOMP_OS_CXX_SOURCES
+        "os/android/logger_android.cpp"
+        "os/android/media_android.cpp"
+        "os/android/process_android.cpp"
+        "os/android/user_android.cpp"
+        "os/android/version_android.cpp"
     )
 endif()
 
@@ -237,6 +247,9 @@ if (WIN32)
     if (${CMAKE_BUILD_TYPE} MATCHES "Release")
         target_link_options(LegacyRecomp PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
     endif()
+elseif (ANDROID)
+    add_library(LegacyRecomp SHARED ${UNLEASHED_RECOMP_CXX_SOURCES})
+    target_compile_definitions(LegacyRecomp PRIVATE SDL_VULKAN_ENABLED)
 else()
     add_executable(LegacyRecomp ${UNLEASHED_RECOMP_CXX_SOURCES})
 endif()
@@ -297,6 +310,17 @@ if (WIN32)
         Synchronization
         winmm
         windowsapp
+    )
+endif()
+
+if (ANDROID)
+    find_library(ANDROID_LIBRARY android REQUIRED)
+    find_library(ANDROID_LOG_LIBRARY log REQUIRED)
+    find_library(ANDROID_VULKAN_LIBRARY vulkan REQUIRED)
+    target_link_libraries(LegacyRecomp PRIVATE
+        ${ANDROID_LIBRARY}
+        ${ANDROID_LOG_LIBRARY}
+        ${ANDROID_VULKAN_LIBRARY}
     )
 endif()
 
