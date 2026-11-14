@@ -4727,11 +4727,13 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
     }
 
+    bool questCameraConstantsOverridden = false;
     {
-        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
             reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
             g_vertexShaderConstants,
             sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
         FlushRenderStateForRenderThread();
 
         auto& commandList = g_commandLists[g_frame];
@@ -4741,8 +4743,9 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
         else
             commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
     }
-    // DrawScope restores the guest constants after the eye-specific upload.
-    g_dirtyStates.vertexShaderConstants = true;
+    // DrawScope restores guest constants after an eye-specific upload.
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawIndexedPrimitive(GuestDevice* device, uint32_t primitiveType, int32_t baseVertexIndex, uint32_t startIndex, uint32_t primCount)
@@ -4769,15 +4772,18 @@ static void ProcDrawIndexedPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
 
     SetPrimitiveType(args.primitiveType);
+    bool questCameraConstantsOverridden = false;
     {
-        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
             reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
             g_vertexShaderConstants,
             sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
         FlushRenderStateForRenderThread();
         g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
     }
-    g_dirtyStates.vertexShaderConstants = true;
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawPrimitiveUP(GuestDevice* device, uint32_t primitiveType, uint32_t primitiveCount, void* vertexStreamZeroData, uint32_t vertexStreamZeroStride)
@@ -4830,11 +4836,13 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
             args.csdFilterState == CsdFilterState::On ? g_csdFilterShader.get() : g_csdShader);
     }
 
+    bool questCameraConstantsOverridden = false;
     {
-        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
             reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
             g_vertexShaderConstants,
             sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
         FlushRenderStateForRenderThread();
 
         if (indexCount != 0)
@@ -4842,7 +4850,8 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
         else
             g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
     }
-    g_dirtyStates.vertexShaderConstants = true;
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static const char* ConvertDeclUsage(uint32_t usage)
