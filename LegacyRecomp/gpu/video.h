@@ -24,6 +24,14 @@ struct Video
     static void StartPipelinePrecompilation();
     static void WaitForGPU();
     static void ComputeViewportDimensions();
+
+    // Quest XR integration entry points. Eye indices: 0=left, 1=right.
+    static void BeginQuestEyeFrame(uint64_t frameSerial);
+    static bool ConfigureQuestCameraMatrixRegister(uint32_t registerIndex);
+    static void SetQuestEyeMatrix(uint32_t eye, const float* matrix16);
+    static void SetQuestActiveEye(uint32_t eye);
+    static void EndQuestEyeFrame();
+    static std::string GetQuestCameraTracePath();
 };
 
 struct GuestSamplerState
