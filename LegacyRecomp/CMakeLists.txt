@@ -280,12 +280,18 @@ endif()
 # DXC is a host tool used to compile SPIR-V shaders during Android builds.
 # Do not resolve a target-ABI CMake package for this host executable.
 if (ANDROID)
+    # In manifest mode vcpkg installs host tools beside the Android build tree:
+    # <build>/vcpkg_installed/<host-triplet>/tools/directx-dxc/dxc.
+    # VCPKG_INSTALLED_DIR is not guaranteed to be populated as a CMake variable
+    # in every vcpkg version, so include the build-tree location explicitly.
     find_program(DIRECTX_DXC_TOOL
         NAMES dxc
         HINTS
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/directx-dxc"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "$ENV{VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "${VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
-            "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
         REQUIRED
     )
 else()
