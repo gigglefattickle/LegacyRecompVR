@@ -1,4 +1,8 @@
 #include "video.h"
+#include "quest/QuestCameraUniformBridge.h"
+#include <algorithm>
+#include <filesystem>
+#include <system_error>
 
 #include "imgui/imgui_common.h"
 #include "imgui/imgui_snapshot.h"
@@ -210,6 +214,74 @@ struct DirtyStates
 };
 
 static DirtyStates g_dirtyStates(true);
+static QuestCameraUniformBridge g_questCameraUniformBridge;
+
+void Video::BeginQuestEyeFrame(uint64_t frameSerial)
+{
+    g_questCameraUniformBridge.BeginFrame(frameSerial);
+}
+
+bool Video::ConfigureQuestCameraMatrixRegister(uint32_t registerIndex)
+{
+    return g_questCameraUniformBridge.ConfigureMatrixRegister(registerIndex);
+}
+
+void Video::SetQuestEyeMatrix(uint32_t eye, const float* matrix16)
+{
+    if (!matrix16 || eye > 1) return;
+    QuestCameraUniformBridge::Matrix4 matrix;
+    std::copy_n(matrix16, 16, matrix.begin());
+    g_questCameraUniformBridge.SetEyeMatrix(
+        eye == 0 ? QuestCameraUniformBridge::Eye::Left : QuestCameraUniformBridge::Eye::Right, matrix);
+}
+
+void Video::SetQuestActiveEye(uint32_t eye)
+{
+    if (eye > 1) { g_questCameraUniformBridge.ClearEye(); return; }
+    g_questCameraUniformBridge.SetEye(
+        eye == 0 ? QuestCameraUniformBridge::Eye::Left : QuestCameraUniformBridge::Eye::Right);
+}
+
+void Video::EndQuestEyeFrame()
+{
+    g_questCameraUniformBridge.ClearEye();
+}
+
+std::string Video::GetQuestCameraTracePath()
+{
+    return g_questCameraUniformBridge.TracePath();
+}
+
+std::string Video::ExportQuestCameraTrace()
+{
+    const std::string source = g_questCameraUniformBridge.TracePath();
+    g_questCameraUniformBridge.FlushTrace();
+    if (source.empty())
+        return {};
+
+    const char* externalPath = SDL_GetExternalStoragePath();
+    std::filesystem::path destinationRoot = externalPath
+        ? std::filesystem::path(externalPath)
+        : std::filesystem::current_path();
+    const std::filesystem::path destination = destinationRoot / "quest-camera-trace.txt";
+    std::error_code error;
+    if (std::filesystem::equivalent(std::filesystem::path(source), destination, error) && !error)
+        return destination.string();
+
+    error.clear();
+    std::filesystem::copy_file(source, destination,
+        std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Quest camera trace export failed (%s): %s",
+            destination.string().c_str(), error.message().c_str());
+        return {};
+    }
+    SDL_Log("Quest camera trace exported: %s", destination.string().c_str());
+    return destination.string();
+}
+
 
 template<typename T>
 static void SetDirtyValue(bool& dirtyState, T& dest, const T& src)
@@ -2616,6 +2688,24 @@ static void DrawImGui()
 
     ResetImGuiCallbacks();
 
+    static std::string questTraceExportStatus;
+    if (ImGui::Begin("Quest VR Tools"))
+    {
+        ImGui::TextUnformatted("Camera trace collection");
+        ImGui::TextWrapped("Exports the latest shader constant trace for camera-register analysis.");
+        if (ImGui::Button("Export camera trace"))
+        {
+            questTraceExportStatus = Video::ExportQuestCameraTrace();
+            if (questTraceExportStatus.empty())
+                questTraceExportStatus = "Export failed. Check the application log.";
+        }
+        if (!questTraceExportStatus.empty())
+            ImGui::TextWrapped("%s", questTraceExportStatus.c_str());
+        else
+            ImGui::TextWrapped("Trace is saved automatically while the game runs.");
+    }
+    ImGui::End();
+
 #ifdef ASYNC_PSO_DEBUG
     if (ImGui::Begin("Async PSO Stats"))
     {
@@ -4464,6 +4554,7 @@ static void ProcSetVertexShaderConstants(const RenderCommand& cmd)
     assert((args.index * sizeof(uint32_t) + args.size) <= sizeof(g_vertexShaderConstants));
 
     memcpy(&g_vertexShaderConstants[args.index], args.memory, args.size);
+    g_questCameraUniformBridge.ObserveGuestWrite(args.index, args.memory, args.size);
     g_dirtyStates.vertexShaderConstants = true;
 }
 
@@ -4686,14 +4777,25 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
     }
 
-    FlushRenderStateForRenderThread();
+    bool questCameraConstantsOverridden = false;
+    {
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
+        FlushRenderStateForRenderThread();
 
-    auto& commandList = g_commandLists[g_frame];
+        auto& commandList = g_commandLists[g_frame];
 
-    if (indexCount > 0)
-        commandList->drawIndexedInstanced(indexCount, args.primitiveCount / indexCount, 0, 0, 0);
-    else
-        commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
+        if (indexCount > 0)
+            commandList->drawIndexedInstanced(indexCount, args.primitiveCount / indexCount, 0, 0, 0);
+        else
+            commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
+    }
+    // DrawScope restores guest constants after an eye-specific upload.
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawIndexedPrimitive(GuestDevice* device, uint32_t primitiveType, int32_t baseVertexIndex, uint32_t startIndex, uint32_t primCount)
@@ -4720,9 +4822,18 @@ static void ProcDrawIndexedPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
 
     SetPrimitiveType(args.primitiveType);
-    FlushRenderStateForRenderThread();
-
-    g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
+    bool questCameraConstantsOverridden = false;
+    {
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
+        FlushRenderStateForRenderThread();
+        g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
+    }
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawPrimitiveUP(GuestDevice* device, uint32_t primitiveType, uint32_t primitiveCount, void* vertexStreamZeroData, uint32_t vertexStreamZeroStride)
@@ -4775,12 +4886,22 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
             args.csdFilterState == CsdFilterState::On ? g_csdFilterShader.get() : g_csdShader);
     }
 
-    FlushRenderStateForRenderThread();
+    bool questCameraConstantsOverridden = false;
+    {
+        auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        questCameraConstantsOverridden = static_cast<bool>(questCameraScope);
+        FlushRenderStateForRenderThread();
 
-    if (indexCount != 0)
-        g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);
-    else
-        g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
+        if (indexCount != 0)
+            g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);
+        else
+            g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
+    }
+    if (questCameraConstantsOverridden)
+        g_dirtyStates.vertexShaderConstants = true;
 }
 
 static const char* ConvertDeclUsage(uint32_t usage)

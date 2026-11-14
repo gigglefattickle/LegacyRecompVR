@@ -5,6 +5,7 @@
 //#define PSO_CACHING_CLEANUP
 
 #include "rhi/plume_render_interface.h"
+#include <cstdint>
 
 #define D3DCLEAR_TARGET  0x1
 #define D3DCLEAR_ZBUFFER 0x10
@@ -24,6 +25,15 @@ struct Video
     static void StartPipelinePrecompilation();
     static void WaitForGPU();
     static void ComputeViewportDimensions();
+
+    // Quest XR integration entry points. Eye indices: 0=left, 1=right.
+    static void BeginQuestEyeFrame(uint64_t frameSerial);
+    static bool ConfigureQuestCameraMatrixRegister(uint32_t registerIndex);
+    static void SetQuestEyeMatrix(uint32_t eye, const float* matrix16);
+    static void SetQuestActiveEye(uint32_t eye);
+    static void EndQuestEyeFrame();
+    static std::string GetQuestCameraTracePath();
+    static std::string ExportQuestCameraTrace();
 };
 
 struct GuestSamplerState

@@ -102,6 +102,7 @@ set(UNLEASHED_RECOMP_CPU_CXX_SOURCES
 
 set(UNLEASHED_RECOMP_GPU_CXX_SOURCES
     "gpu/video.cpp"
+    "gpu/quest/QuestCameraUniformBridge.cpp"
     "gpu/imgui/imgui_common.cpp"
     "gpu/imgui/imgui_font_builder.cpp"
     "gpu/imgui/imgui_snapshot.cpp"
@@ -317,6 +318,7 @@ target_link_libraries(LegacyRecomp PRIVATE
 
 target_include_directories(LegacyRecomp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/gpu
     ${UNLEASHED_RECOMP_THIRDPARTY_INCLUDES}
 )
 
