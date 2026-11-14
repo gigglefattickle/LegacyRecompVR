@@ -16,9 +16,11 @@ void QuestCameraUniformBridge::EnsureTraceOpen(){
     m_trace.open(m_tracePath,std::ios::out|std::ios::trunc);
     if(m_trace){m_trace<<"# LegacyRecomp Quest camera constant trace v1\n";m_trace.flush();SDL_Log("Quest camera trace: %s",m_tracePath.c_str());}
 }
-std::string QuestCameraUniformBridge::TracePath(){EnsureTraceOpen();return m_tracePath;}
+std::string QuestCameraUniformBridge::TracePath(){std::lock_guard lock(m_traceMutex);EnsureTraceOpen();return m_tracePath;}
+void QuestCameraUniformBridge::FlushTrace(){std::lock_guard lock(m_traceMutex);if(m_trace.is_open())m_trace.flush();}
 void QuestCameraUniformBridge::ObserveGuestWrite(uint32_t index,const void* source,size_t bytes){
     if(!source||bytes==0||bytes%sizeof(uint32_t))return;
+    std::lock_guard lock(m_traceMutex);
     const auto* words=static_cast<const uint32_t*>(source);
     const uint32_t count=static_cast<uint32_t>(bytes/sizeof(uint32_t));
     GuestWrite w{index,count,++m_writeSerial};
@@ -42,6 +44,7 @@ void QuestCameraUniformBridge::DisableMatrixOverride(){m_matrixRegisterConfigure
 void QuestCameraUniformBridge::SetEyeMatrix(Eye eye,const Matrix4& matrix){m_eyeMatrices[static_cast<size_t>(eye)]=matrix;}
 void QuestCameraUniformBridge::SetObservers(GuestWriteObserver writes,DrawObserver draws){m_writeObserver=std::move(writes);m_drawObserver=std::move(draws);}
 void QuestCameraUniformBridge::TraceDraw(uintptr_t shader,const uint32_t* constants,size_t count){
+    std::lock_guard lock(m_traceMutex);
     bool any=false;for(bool dirty:m_dirtyRegisters)any|=dirty;
     if(!any)return;
     EnsureTraceOpen();if(!m_trace)return;
