@@ -846,6 +846,24 @@ namespace quest
         return swapchain.images[swapchain.imageIndex].image;
     }
 
+    bool OpenXRRuntime::GetEyeFrameData(uint32_t eye, EyeFrameData& frameData) const
+    {
+        if (!m_frameBegun || eye >= m_eyeSwapchains.size())
+            return false;
+
+        const EyeSwapchain& swapchain = m_eyeSwapchains[eye];
+        if (!swapchain.acquired || swapchain.imageIndex >= swapchain.images.size())
+            return false;
+
+        frameData.image = swapchain.images[swapchain.imageIndex].image;
+        frameData.swapchain = swapchain.handle;
+        frameData.view = m_views[eye];
+        frameData.width = swapchain.width;
+        frameData.height = swapchain.height;
+        frameData.imageIndex = swapchain.imageIndex;
+        return frameData.image != VK_NULL_HANDLE;
+    }
+
     XrSwapchain OpenXRRuntime::GetEyeSwapchain(uint32_t eye) const
     {
         return eye < m_eyeSwapchains.size() ? m_eyeSwapchains[eye].handle : XR_NULL_HANDLE;
