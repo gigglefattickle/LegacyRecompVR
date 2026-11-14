@@ -287,6 +287,9 @@ if (ANDROID)
     find_program(DIRECTX_DXC_TOOL
         NAMES dxc
         HINTS
+            # vcpkg port logs show the host executable in this package staging directory.
+            "$ENV{VCPKG_ROOT}/packages/directx-dxc_x64-linux/tools/directx-dxc"
+            "$ENV{VCPKG_ROOT}/packages/directx-dxc_${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/directx-dxc"
             "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
