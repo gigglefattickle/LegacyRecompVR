@@ -1753,12 +1753,18 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
         g_questOpenXR.GetVulkanPhysicalDevice(),
         g_questOpenXR.GetDeviceCreateCallback());
     if (!xrInterface->isValid())
+    {
+        g_questOpenXR.Shutdown();
         return false;
+    }
 
     g_interface = std::move(xrInterface);
     g_device = g_interface->createDevice();
     if (!g_device)
+    {
+        g_questOpenXR.Shutdown();
         return false;
+    }
 
     auto* xrPlumeDevice = static_cast<plume::VulkanDevice*>(g_device.get());
     constexpr uint32_t DIRECT_QUEUE_FAMILY_INDEX = 0;
@@ -1766,7 +1772,10 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
         xrPlumeDevice->vk,
         xrPlumeDevice->queueFamilyIndices[DIRECT_QUEUE_FAMILY_INDEX],
         0))
+    {
+        g_questOpenXR.Shutdown();
         return false;
+    }
 #else
 
 //
