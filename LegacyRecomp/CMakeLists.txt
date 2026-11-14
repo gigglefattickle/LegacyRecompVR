@@ -188,6 +188,7 @@ set(UNLEASHED_RECOMP_CXX_SOURCES
     "sdl_listener.cpp"
     "stdafx.cpp"
     "version.cpp"
+    "vr/locomotion.cpp"
 
     ${UNLEASHED_RECOMP_KERNEL_CXX_SOURCES}
     ${UNLEASHED_RECOMP_OS_CXX_SOURCES}
