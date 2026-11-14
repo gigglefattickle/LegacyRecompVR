@@ -5,10 +5,14 @@ on:
     branches: ["android/arm64-phase1"]
     paths:
       - "android/arm64-probe/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
       - ".github/workflows/android-arm64-probe.yml"
   pull_request:
     paths:
       - "android/arm64-probe/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
       - ".github/workflows/android-arm64-probe.yml"
   workflow_dispatch:
 
