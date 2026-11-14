@@ -493,8 +493,8 @@ namespace quest
 
         if (!createAction(XR_ACTION_TYPE_POSE_INPUT, "aim_pose", "Aim Pose", &m_aimPoseAction) ||
             !createAction(XR_ACTION_TYPE_POSE_INPUT, "grip_pose", "Grip Pose", &m_gripPoseAction) ||
-            !createAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "trigger", "Trigger", &m_triggerAction) ||
-            !createAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "squeeze", "Squeeze", &m_squeezeAction) ||
+            !createAction(XR_ACTION_TYPE_FLOAT_INPUT, "trigger", "Trigger", &m_triggerAction) ||
+            !createAction(XR_ACTION_TYPE_FLOAT_INPUT, "squeeze", "Squeeze", &m_squeezeAction) ||
             !createAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "primary_button", "Primary Button", &m_primaryAction) ||
             !createAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary_button", "Secondary Button", &m_secondaryAction) ||
             !createAction(XR_ACTION_TYPE_VECTOR2F_INPUT, "thumbstick", "Thumbstick", &m_thumbstickAction))
@@ -519,10 +519,10 @@ namespace quest
         addBinding(m_aimPoseAction, "/user/hand/right/input/aim/pose");
         addBinding(m_gripPoseAction, "/user/hand/left/input/grip/pose");
         addBinding(m_gripPoseAction, "/user/hand/right/input/grip/pose");
-        addBinding(m_triggerAction, "/user/hand/left/input/trigger/click");
-        addBinding(m_triggerAction, "/user/hand/right/input/trigger/click");
-        addBinding(m_squeezeAction, "/user/hand/left/input/squeeze/click");
-        addBinding(m_squeezeAction, "/user/hand/right/input/squeeze/click");
+        addBinding(m_triggerAction, "/user/hand/left/input/trigger/value");
+        addBinding(m_triggerAction, "/user/hand/right/input/trigger/value");
+        addBinding(m_squeezeAction, "/user/hand/left/input/squeeze/value");
+        addBinding(m_squeezeAction, "/user/hand/right/input/squeeze/value");
         addBinding(m_primaryAction, "/user/hand/left/input/x/click");
         addBinding(m_primaryAction, "/user/hand/right/input/a/click");
         addBinding(m_secondaryAction, "/user/hand/left/input/y/click");
@@ -708,20 +708,32 @@ namespace quest
             state.aimTracked = LocateActionPose(m_aimPoseAction, m_handPaths[hand], m_aimSpaces[hand], m_viewSpace, displayTime, state.aimPose);
             state.gripTracked = LocateActionPose(m_gripPoseAction, m_handPaths[hand], m_gripSpaces[hand], m_viewSpace, displayTime, state.gripPose);
 
+            auto readFloatPressed = [this, hand](XrAction action, bool& value)
+            {
+                XrActionStateGetInfo getInfo{ XR_TYPE_ACTION_STATE_GET_INFO };
+                getInfo.action = action;
+                getInfo.subactionPath = m_handPaths[hand];
+                XrActionStateFloat actionState{ XR_TYPE_ACTION_STATE_FLOAT };
+                if (XR_SUCCEEDED(xrGetActionStateFloat(m_session, &getInfo, &actionState)))
+                    value = actionState.isActive && actionState.currentState >= 0.55f;
+                else
+                    value = false;
+            };
+
             auto readBoolean = [this, hand](XrAction action, bool& value)
             {
                 XrActionStateGetInfo getInfo{ XR_TYPE_ACTION_STATE_GET_INFO };
                 getInfo.action = action;
                 getInfo.subactionPath = m_handPaths[hand];
-                XrActionStateBoolean state{ XR_TYPE_ACTION_STATE_BOOLEAN };
-                if (XR_SUCCEEDED(xrGetActionStateBoolean(m_session, &getInfo, &state)))
-                    value = state.isActive && state.currentState;
+                XrActionStateBoolean actionState{ XR_TYPE_ACTION_STATE_BOOLEAN };
+                if (XR_SUCCEEDED(xrGetActionStateBoolean(m_session, &getInfo, &actionState)))
+                    value = actionState.isActive && actionState.currentState;
                 else
                     value = false;
             };
 
-            readBoolean(m_triggerAction, state.triggerDown);
-            readBoolean(m_squeezeAction, state.squeezeDown);
+            readFloatPressed(m_triggerAction, state.triggerDown);
+            readFloatPressed(m_squeezeAction, state.squeezeDown);
             readBoolean(m_primaryAction, state.primaryDown);
             readBoolean(m_secondaryAction, state.secondaryDown);
 
