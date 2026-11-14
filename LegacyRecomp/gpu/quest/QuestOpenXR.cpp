@@ -702,8 +702,8 @@ namespace quest
         for (uint32_t hand = 0; hand < 2; ++hand)
         {
             TouchControllerState& state = m_controllers[hand];
-            state.aimTracked = LocateActionPose(m_aimPoseAction, m_aimSpaces[hand], m_viewSpace, displayTime, state.aimPose);
-            state.gripTracked = LocateActionPose(m_gripPoseAction, m_gripSpaces[hand], m_viewSpace, displayTime, state.gripPose);
+            state.aimTracked = LocateActionPose(m_aimPoseAction, m_handPaths[hand], m_aimSpaces[hand], m_viewSpace, displayTime, state.aimPose);
+            state.gripTracked = LocateActionPose(m_gripPoseAction, m_handPaths[hand], m_gripSpaces[hand], m_viewSpace, displayTime, state.gripPose);
 
             auto readBoolean = [this, hand](XrAction action, bool& value)
             {
@@ -734,10 +734,11 @@ namespace quest
     }
 
     bool OpenXRRuntime::LocateActionPose(
-        XrAction action, XrSpace space, XrSpace baseSpace, XrTime time, XrPosef& pose)
+        XrAction action, XrPath subactionPath, XrSpace space, XrSpace baseSpace, XrTime time, XrPosef& pose)
     {
         XrActionStateGetInfo getInfo{ XR_TYPE_ACTION_STATE_GET_INFO };
         getInfo.action = action;
+        getInfo.subactionPath = subactionPath;
 
         XrActionStatePose poseState{ XR_TYPE_ACTION_STATE_POSE };
         if (XR_FAILED(xrGetActionStatePose(m_session, &getInfo, &poseState)) || !poseState.isActive)
