@@ -9,6 +9,9 @@ if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
     message(FATAL_ERROR "Expected ANDROID_ABI=arm64-v8a, got '${ANDROID_ABI}'.")
 endif()
 
+# Exercise the same architecture policy used by the full project.
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/TargetArchitecture.cmake")
+
 add_library(legacyrecomp_android_arm64_probe SHARED probe.cpp)
 target_compile_features(legacyrecomp_android_arm64_probe PRIVATE cxx_std_17)
 target_compile_definitions(legacyrecomp_android_arm64_probe PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
