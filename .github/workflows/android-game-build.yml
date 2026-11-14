@@ -1,0 +1,81 @@
+name: Android ARM64 game build
+
+on:
+  push:
+    branches: ["android/arm64-phase1"]
+    paths:
+      - "LegacyRecomp/**"
+      - "LegacyRecompLib/**"
+      - "thirdparty/**"
+      - "tools/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - ".github/workflows/android-game-build.yml"
+  pull_request:
+    paths:
+      - "LegacyRecomp/**"
+      - "LegacyRecompLib/**"
+      - "thirdparty/**"
+      - "tools/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - ".github/workflows/android-game-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-game-arm64:
+    name: Configure and compile LegacyRecomp for Android ARM64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK tools
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android NDK and CMake
+        run: |
+          sdkmanager "ndk;27.2.12479018" "cmake;3.31.6"
+          echo "$ANDROID_HOME/cmake/3.31.6/bin" >> "$GITHUB_PATH"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Bootstrap vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Install manifest dependencies and configure Android
+        run: |
+          cmake -S . -B out/android-arm64 -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DVCPKG_TARGET_TRIPLET=arm64-android \
+            -DVCPKG_HOST_TRIPLET=x64-linux \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compile actual game shared library
+        run: cmake --build out/android-arm64 --target LegacyRecomp --parallel 2 --verbose
+
+      - name: Upload Android game library
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacyrecomp-game-arm64-so
+          path: out/android-arm64/LegacyRecomp/libLegacyRecomp.so
+          if-no-files-found: error
