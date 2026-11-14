@@ -4390,7 +4390,7 @@ namespace plume {
         VkPhysicalDevice requiredPhysicalDevice,
         DeviceCreateCallback createDeviceCallback)
     {
-        if (volkInitialize() != VK_SUCCESS || externalInstance == VK_NULL_HANDLE ||
+        if (externalInstance == VK_NULL_HANDLE ||
             requiredPhysicalDevice == VK_NULL_HANDLE || !createDeviceCallback)
             return;
 
