@@ -276,7 +276,19 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_compile_definitions(LegacyRecomp PRIVATE SDL_VULKAN_ENABLED)
 endif()
 
-find_package(directx-dxc REQUIRED)
+# DXC is a host tool used to compile SPIR-V shaders during Android builds.
+# Do not resolve a target-ABI CMake package for this host executable.
+if (ANDROID)
+    find_program(DIRECTX_DXC_TOOL
+        NAMES dxc
+        HINTS
+            "${VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+        REQUIRED
+    )
+else()
+    find_package(directx-dxc REQUIRED)
+endif()
 find_package(CURL REQUIRED)
 
 if (UNLEASHED_RECOMP_D3D12)
