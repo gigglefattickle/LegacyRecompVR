@@ -274,7 +274,7 @@ find_package(CURL REQUIRED)
 
 if (ANDROID)
     # The Khronos Android loader is supplied by the Gradle Prefab dependency:
-    # org.khronos.openxr:openxr_loader_for_android:1.1.62
+    # org.khronos.openxr:openxr_loader_for_android:1.1.65
     find_package(OpenXR CONFIG REQUIRED)
     find_library(ANDROID_LOG_LIBRARY log REQUIRED)
     target_compile_definitions(LegacyRecomp PRIVATE
