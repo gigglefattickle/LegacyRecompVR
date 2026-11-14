@@ -103,6 +103,7 @@ elseif (ANDROID)
         "os/android/process_android.cpp"
         "os/android/user_android.cpp"
         "os/android/version_android.cpp"
+        "os/android/storage_android.cpp"
     )
 endif()
 
