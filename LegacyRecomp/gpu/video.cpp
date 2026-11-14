@@ -213,6 +213,43 @@ struct DirtyStates
 static DirtyStates g_dirtyStates(true);
 static QuestCameraUniformBridge g_questCameraUniformBridge;
 
+void Video::BeginQuestEyeFrame(uint64_t frameSerial)
+{
+    g_questCameraUniformBridge.BeginFrame(frameSerial);
+}
+
+bool Video::ConfigureQuestCameraMatrixRegister(uint32_t registerIndex)
+{
+    return g_questCameraUniformBridge.ConfigureMatrixRegister(registerIndex);
+}
+
+void Video::SetQuestEyeMatrix(uint32_t eye, const float* matrix16)
+{
+    if (!matrix16 || eye > 1) return;
+    QuestCameraUniformBridge::Matrix4 matrix;
+    std::copy_n(matrix16, 16, matrix.begin());
+    g_questCameraUniformBridge.SetEyeMatrix(
+        eye == 0 ? QuestCameraUniformBridge::Eye::Left : QuestCameraUniformBridge::Eye::Right, matrix);
+}
+
+void Video::SetQuestActiveEye(uint32_t eye)
+{
+    if (eye > 1) { g_questCameraUniformBridge.ClearEye(); return; }
+    g_questCameraUniformBridge.SetEye(
+        eye == 0 ? QuestCameraUniformBridge::Eye::Left : QuestCameraUniformBridge::Eye::Right);
+}
+
+void Video::EndQuestEyeFrame()
+{
+    g_questCameraUniformBridge.ClearEye();
+}
+
+std::string Video::GetQuestCameraTracePath()
+{
+    return g_questCameraUniformBridge.TracePath();
+}
+
+
 template<typename T>
 static void SetDirtyValue(bool& dirtyState, T& dest, const T& src)
 {
