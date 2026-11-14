@@ -33,6 +33,7 @@ struct Video
     static void SetQuestActiveEye(uint32_t eye);
     static void EndQuestEyeFrame();
     static std::string GetQuestCameraTracePath();
+    static std::string ExportQuestCameraTrace();
 };
 
 struct GuestSamplerState
