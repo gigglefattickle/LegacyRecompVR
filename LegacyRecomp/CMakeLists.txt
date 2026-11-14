@@ -328,7 +328,6 @@ target_link_libraries(LegacyRecomp PRIVATE
     fmt::fmt
     libzstd_static
     msdf-atlas-gen::msdf-atlas-gen
-    nfd::nfd
     o1heap
     XenonUtils
     SDL2::SDL2-static
@@ -338,6 +337,14 @@ target_link_libraries(LegacyRecomp PRIVATE
     xxHash::xxhash
     CURL::libcurl
 )
+
+if (NOT ANDROID)
+    target_link_libraries(LegacyRecomp PRIVATE nfd::nfd)
+else()
+    # Native File Dialog Extended supports desktop platforms only. Android uses
+    # the platform document picker integration instead of GTK/Win32 dialogs.
+    target_include_directories(LegacyRecomp PRIVATE "${UNLEASHED_RECOMP_THIRDPARTY_ROOT}/nativefiledialog-extended/src/include")
+endif()
 
 target_include_directories(LegacyRecomp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
