@@ -6,6 +6,7 @@
 #include <functional>
 #include <fstream>
 #include <string>
+#include <mutex>
 #include <utility>
 
 class QuestCameraUniformBridge {
@@ -24,6 +25,7 @@ public:
     void SetEyeMatrix(Eye eye, const Matrix4& matrix);
     void SetObservers(GuestWriteObserver writes, DrawObserver draws);
     std::string TracePath();
+    void FlushTrace();
     class DrawScope {
     public:
         DrawScope()=default;
@@ -51,6 +53,7 @@ private:
     void RestoreDraw(uint32_t*,size_t,uint32_t,const std::array<uint32_t,16>&);
     void EnsureTraceOpen();
     void TraceDraw(uintptr_t, const uint32_t*, size_t);
+    std::mutex m_traceMutex;
     std::ofstream m_trace;
     std::string m_tracePath;
     std::array<bool,256> m_dirtyRegisters{};
