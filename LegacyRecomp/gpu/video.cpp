@@ -1,4 +1,5 @@
 #include "video.h"
+#include "quest/QuestCameraUniformBridge.h"
 
 #include "imgui/imgui_common.h"
 #include "imgui/imgui_snapshot.h"
@@ -210,6 +211,7 @@ struct DirtyStates
 };
 
 static DirtyStates g_dirtyStates(true);
+static QuestCameraUniformBridge g_questCameraUniformBridge;
 
 template<typename T>
 static void SetDirtyValue(bool& dirtyState, T& dest, const T& src)
@@ -4464,6 +4466,7 @@ static void ProcSetVertexShaderConstants(const RenderCommand& cmd)
     assert((args.index * sizeof(uint32_t) + args.size) <= sizeof(g_vertexShaderConstants));
 
     memcpy(&g_vertexShaderConstants[args.index], args.memory, args.size);
+    g_questCameraUniformBridge.ObserveGuestWrite(args.index, args.memory, args.size);
     g_dirtyStates.vertexShaderConstants = true;
 }
 
@@ -4686,14 +4689,22 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
     }
 
-    FlushRenderStateForRenderThread();
+    {
+        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        FlushRenderStateForRenderThread();
 
-    auto& commandList = g_commandLists[g_frame];
+        auto& commandList = g_commandLists[g_frame];
 
-    if (indexCount > 0)
-        commandList->drawIndexedInstanced(indexCount, args.primitiveCount / indexCount, 0, 0, 0);
-    else
-        commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
+        if (indexCount > 0)
+            commandList->drawIndexedInstanced(indexCount, args.primitiveCount / indexCount, 0, 0, 0);
+        else
+            commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
+    }
+    // DrawScope restores the guest constants after the eye-specific upload.
+    g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawIndexedPrimitive(GuestDevice* device, uint32_t primitiveType, int32_t baseVertexIndex, uint32_t startIndex, uint32_t primCount)
@@ -4720,9 +4731,15 @@ static void ProcDrawIndexedPrimitive(const RenderCommand& cmd)
         UnsetInstancingStream();
 
     SetPrimitiveType(args.primitiveType);
-    FlushRenderStateForRenderThread();
-
-    g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
+    {
+        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        FlushRenderStateForRenderThread();
+        g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
+    }
+    g_dirtyStates.vertexShaderConstants = true;
 }
 
 static void DrawPrimitiveUP(GuestDevice* device, uint32_t primitiveType, uint32_t primitiveCount, void* vertexStreamZeroData, uint32_t vertexStreamZeroStride)
@@ -4775,12 +4792,19 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
             args.csdFilterState == CsdFilterState::On ? g_csdFilterShader.get() : g_csdShader);
     }
 
-    FlushRenderStateForRenderThread();
+    {
+        [[maybe_unused]] auto questCameraScope = g_questCameraUniformBridge.BeginDraw(
+            reinterpret_cast<uintptr_t>(g_pipelineState.vertexShader),
+            g_vertexShaderConstants,
+            sizeof(g_vertexShaderConstants) / sizeof(g_vertexShaderConstants[0]));
+        FlushRenderStateForRenderThread();
 
-    if (indexCount != 0)
-        g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);
-    else
-        g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
+        if (indexCount != 0)
+            g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);
+        else
+            g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
+    }
+    g_dirtyStates.vertexShaderConstants = true;
 }
 
 static const char* ConvertDeclUsage(uint32_t usage)
