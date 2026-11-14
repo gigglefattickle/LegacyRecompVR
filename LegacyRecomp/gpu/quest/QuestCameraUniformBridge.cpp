@@ -1,9 +1,9 @@
 #include "QuestCameraUniformBridge.h"
 #include <cassert>
+#include <algorithm>
 #include <utility>
 #include <SDL.h>
 #include <iomanip>
-#include <sstream>
 
 void QuestCameraUniformBridge::BeginFrame(uint64_t serial){m_frameSerial=serial;m_eyeActive=false;}
 void QuestCameraUniformBridge::SetEye(Eye eye){m_eye=eye;m_eyeActive=true;}
@@ -14,7 +14,7 @@ void QuestCameraUniformBridge::EnsureTraceOpen(){
     if(base){m_tracePath=std::string(base)+"quest-camera-trace.txt";SDL_free(base);}
     else m_tracePath="quest-camera-trace.txt";
     m_trace.open(m_tracePath,std::ios::out|std::ios::trunc);
-    if(m_trace){m_trace<<"# LegacyRecomp Quest camera constant trace v1\\n";m_trace.flush();SDL_Log("Quest camera trace: %s",m_tracePath.c_str());}
+    if(m_trace){m_trace<<"# LegacyRecomp Quest camera constant trace v1\n";m_trace.flush();SDL_Log("Quest camera trace: %s",m_tracePath.c_str());}
 }
 std::string QuestCameraUniformBridge::TracePath(){EnsureTraceOpen();return m_tracePath;}
 void QuestCameraUniformBridge::ObserveGuestWrite(uint32_t index,const void* source,size_t bytes){
@@ -27,7 +27,7 @@ void QuestCameraUniformBridge::ObserveGuestWrite(uint32_t index,const void* sour
     if(m_trace&&m_traceEventCount<50000){
         m_trace<<"WRITE frame="<<m_frameSerial<<" seq="<<w.serial<<" first_float="<<index<<" count="<<count<<" data=";
         for(uint32_t i=0;i<count;++i)m_trace<<std::hex<<std::setw(8)<<std::setfill('0')<<words[i]<<",";
-        m_trace<<std::dec<<"\\n";
+        m_trace<<std::dec<<"\n";
         ++m_traceEventCount;
     }
     if(count){
@@ -45,10 +45,11 @@ void QuestCameraUniformBridge::TraceDraw(uintptr_t shader,const uint32_t* consta
     bool any=false;for(bool dirty:m_dirtyRegisters)any|=dirty;
     if(!any)return;
     EnsureTraceOpen();if(!m_trace)return;
-    m_trace<<"DRAW frame="<<m_frameSerial<<" shader=0x"<<std::hex<<shader<<std::dec<<" eye="<<(m_eyeActive?int(m_eye):-1)<<"\\n";
+    if(m_traceEventCount>=50000){m_dirtyRegisters.fill(false);return;}
+    m_trace<<"DRAW frame="<<m_frameSerial<<" shader=0x"<<std::hex<<shader<<std::dec<<" eye="<<(m_eyeActive?int(m_eye):-1)<<"\n";
     for(uint32_t r=0;r<256;++r)if(m_dirtyRegisters[r]){
         const uint32_t first=r*4;
-        if(first+4<=count)m_trace<<"REG c"<<r<<" "<<std::hex<<std::setw(8)<<std::setfill('0')<<constants[first]<<" "<<std::setw(8)<<constants[first+1]<<" "<<std::setw(8)<<constants[first+2]<<" "<<std::setw(8)<<constants[first+3]<<std::dec<<"\\n";
+        if(first+4<=count)m_trace<<"REG c"<<r<<" "<<std::hex<<std::setw(8)<<std::setfill('0')<<constants[first]<<" "<<std::setw(8)<<constants[first+1]<<" "<<std::setw(8)<<constants[first+2]<<" "<<std::setw(8)<<constants[first+3]<<std::dec<<"\n";
         m_dirtyRegisters[r]=false;
     }
     m_trace.flush();
