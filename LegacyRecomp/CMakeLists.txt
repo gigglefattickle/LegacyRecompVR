@@ -283,6 +283,7 @@ if (ANDROID)
     find_program(DIRECTX_DXC_TOOL
         NAMES dxc
         HINTS
+            "$ENV{VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "${VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
             "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
         REQUIRED
