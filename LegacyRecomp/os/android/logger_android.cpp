@@ -7,6 +7,9 @@
 #include <signal.h>
 #include <unistd.h>
 
+#include <cstdlib>
+#include <cstring>
+#include <exception>
 #include <mutex>
 
 namespace
