@@ -5,6 +5,8 @@
 #include "rhi/plume_vulkan.h"
 #endif
 #include <algorithm>
+#include <array>
+#include <vector>
 #include <filesystem>
 #include <system_error>
 
@@ -221,6 +223,8 @@ static DirtyStates g_dirtyStates(true);
 static QuestCameraUniformBridge g_questCameraUniformBridge;
 #if defined(UNLEASHED_RECOMP_OPENXR)
 static quest::OpenXRRuntime& g_questOpenXR = quest::GetOpenXRRuntime();
+static std::array<std::vector<std::unique_ptr<plume::VulkanTexture>>, 2> g_questEyeTextures;
+static std::array<std::vector<std::unique_ptr<RenderFramebuffer>>, 2> g_questEyeFramebuffers;
 #endif
 
 void Video::BeginQuestEyeFrame(uint64_t frameSerial)
@@ -258,6 +262,57 @@ void Video::EndQuestEyeFrame()
 bool Video::GetQuestEyeFrameData(uint32_t eye, quest::EyeFrameData& frameData)
 {
     return g_questOpenXR.GetEyeFrameData(eye, frameData);
+}
+
+bool Video::PrepareQuestEyeRenderTarget(uint32_t eye, RenderTexture*& texture, RenderFramebuffer*& framebuffer)
+{
+    texture = nullptr;
+    framebuffer = nullptr;
+
+    quest::EyeFrameData eyeData;
+    if (eye >= 2 || !g_device || !g_questOpenXR.GetEyeFrameData(eye, eyeData))
+        return false;
+
+    if (eyeData.format != VK_FORMAT_R8G8B8A8_UNORM &&
+        eyeData.format != VK_FORMAT_B8G8R8A8_UNORM)
+        return false;
+
+    auto* vkDevice = static_cast<plume::VulkanDevice*>(g_device.get());
+    auto& textures = g_questEyeTextures[eye];
+    auto& framebuffers = g_questEyeFramebuffers[eye];
+    const size_t imageIndex = eyeData.imageIndex;
+    if (textures.size() <= imageIndex)
+    {
+        textures.resize(imageIndex + 1);
+        framebuffers.resize(imageIndex + 1);
+    }
+
+    if (!textures[imageIndex] || textures[imageIndex]->vk != eyeData.image)
+    {
+        framebuffers[imageIndex].reset();
+        textures[imageIndex] = std::make_unique<plume::VulkanTexture>(
+            vkDevice, eyeData.image, eyeData.format, eyeData.width, eyeData.height);
+        if (textures[imageIndex]->imageView == VK_NULL_HANDLE)
+        {
+            textures[imageIndex].reset();
+            return false;
+        }
+
+        const RenderTexture* colorAttachment = textures[imageIndex].get();
+        RenderFramebufferDesc desc;
+        desc.colorAttachments = &colorAttachment;
+        desc.colorAttachmentsCount = 1;
+        framebuffers[imageIndex] = g_device->createFramebuffer(desc);
+        if (!framebuffers[imageIndex])
+        {
+            textures[imageIndex].reset();
+            return false;
+        }
+    }
+
+    texture = textures[imageIndex].get();
+    framebuffer = framebuffers[imageIndex].get();
+    return true;
 }
 #endif
 
