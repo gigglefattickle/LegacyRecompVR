@@ -27,7 +27,9 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android NDK and CMake
-        run: sdkmanager "ndk;27.2.12479018" "cmake;3.31.6"
+        run: |
+          sdkmanager "ndk;27.2.12479018" "cmake;3.31.6"
+          echo "$ANDROID_HOME/cmake/3.31.6/bin" >> "$GITHUB_PATH"
 
       - name: Configure for Android arm64-v8a
         run: |
