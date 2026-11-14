@@ -25,6 +25,17 @@ namespace quest
         float y = 0.0f;
     };
 
+    // Data handoff from the XR runtime to the Plume video layer for one acquired eye.
+    struct EyeFrameData
+    {
+        VkImage image = VK_NULL_HANDLE;
+        XrSwapchain swapchain = XR_NULL_HANDLE;
+        XrView view{ XR_TYPE_VIEW };
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t imageIndex = 0;
+    };
+
     struct TouchControllerState
     {
         bool aimTracked = false;
@@ -61,6 +72,7 @@ namespace quest
         const XrView* GetViews() const { return m_views.data(); }
         uint32_t GetViewCount() const { return static_cast<uint32_t>(m_views.size()); }
         VkImage GetEyeImage(uint32_t eye) const;
+        bool GetEyeFrameData(uint32_t eye, EyeFrameData& frameData) const;
         XrSwapchain GetEyeSwapchain(uint32_t eye) const;
         uint32_t GetEyeWidth(uint32_t eye) const;
         uint32_t GetEyeHeight(uint32_t eye) const;
