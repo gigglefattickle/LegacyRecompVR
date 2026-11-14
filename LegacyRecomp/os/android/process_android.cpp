@@ -1,4 +1,5 @@
 #include <os/process.h>
+#include "storage_android.h"
 
 #include <SDL_system.h>
 #include <unistd.h>
@@ -11,8 +12,8 @@ std::filesystem::path os::process::GetExecutablePath()
 
 std::filesystem::path os::process::GetWorkingDirectory()
 {
-    const char* path = SDL_AndroidGetInternalStoragePath();
-    return path != nullptr ? std::filesystem::path(path) : std::filesystem::path{};
+    (void)os::android::storage::EnsureDirectories();
+    return os::android::storage::GetAppFilesDirectory();
 }
 
 bool os::process::SetWorkingDirectory(const std::filesystem::path& path)
