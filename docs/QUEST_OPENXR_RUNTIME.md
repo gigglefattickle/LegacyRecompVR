@@ -35,7 +35,7 @@ Do not create a second launcher activity; add the OpenXR category to the activit
 
 **This is not yet a working stereo game renderer.** Plume's current LegacyRecomp path records one guest command list to one back buffer. The OpenXR runtime now owns two eye swapchains, but the existing guest rendering path has not been refactored to record/submit the scene to both eye images with their independent view/projection transforms. Therefore the present loop intentionally calls `xrEndFrame` with no projection layer. It avoids presenting uninitialized swapchain images.
 
-The current Plume target remains an offscreen 1280x720 texture for this interim session/input integration. `GetViews()`, `GetEyeImage()`, the eye swapchain accessors, and `Video::GetQuestEyeFrameData()` expose each acquired `VkImage` together with its matching `XrView` to the video/render layer. That is the Plume handoff seam; the actual stereo draw path still has to consume it.
+The current Plume target remains an offscreen 1280x720 texture for this interim session/input integration. `GetViews()`, `GetEyeImage()`, the eye swapchain accessors, and `Video::GetQuestEyeFrameData()` expose each acquired `VkImage`, its `VkFormat`, dimensions, swapchain/image index, and matching `XrView` to the video/render layer. That is the Plume handoff seam; the actual stereo draw path still has to consume it.
 
 ## Android build limitations
 
