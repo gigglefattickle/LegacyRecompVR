@@ -6,7 +6,17 @@ This branch adds the first Android/OpenXR runtime path for the Quest 3 target.
 
 The Android application module must enable Prefab and include the Khronos loader AAR. A Gradle fragment is provided at `android/quest-openxr.gradle`; apply it from the real Android app module's `build.gradle`.
 
-The consuming app also needs an Android activity that initializes SDL before the native entry point calls `Video::CreateHostDevice`. The OpenXR code obtains the JavaVM and Activity through SDL's Android APIs. The activity intent filter must advertise an immersive HMD application using `org.khronos.openxr.intent.category.IMMERSIVE_HMD`.
+The consuming app also needs an Android activity that initializes SDL before the native entry point calls `Video::CreateHostDevice`. The OpenXR code obtains the JavaVM and Activity through SDL's Android APIs. Add the following categories to the SDL activity's existing launcher intent filter:
+
+```xml
+<intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="org.khronos.openxr.intent.category.IMMERSIVE_HMD" />
+    <category android:name="android.intent.category.LAUNCHER" />
+</intent-filter>
+```
+
+Do not create a second launcher activity; add the OpenXR category to the activity that actually hosts SDL.
 
 ## What this branch implements
 
