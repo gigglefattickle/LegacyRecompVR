@@ -26,17 +26,19 @@ foreach(i RANGE 0 179)
     list(APPEND UNLEASHED_RECOMP_PPC_RECOMPILED_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ppc/ppc_recomp.${i}.cpp")
 endforeach()
 
-add_custom_command(
-    OUTPUT 
-        #"${CMAKE_CURRENT_SOURCE_DIR}/private/default_patched.xex"
-        ${UNLEASHED_RECOMP_PPC_RECOMPILED_SOURCES}
-    COMMAND 
-        $<TARGET_FILE:XenonRecomp>
-    DEPENDS 
-        "${CMAKE_CURRENT_SOURCE_DIR}/private/tu2.xex"
-        #"${CMAKE_CURRENT_SOURCE_DIR}/private/default.xexp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/config/LCE.toml"
-)
+# The checked-in PPC translation units are already generated. Android CI must
+# compile those sources without requiring the user's private game executable.
+if (NOT ANDROID)
+    add_custom_command(
+        OUTPUT
+            ${UNLEASHED_RECOMP_PPC_RECOMPILED_SOURCES}
+        COMMAND
+            $<TARGET_FILE:XenonRecomp>
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/private/tu2.xex"
+            "${CMAKE_CURRENT_SOURCE_DIR}/config/LCE.toml"
+    )
+endif()
 
 #add_custom_command(
 #    OUTPUT

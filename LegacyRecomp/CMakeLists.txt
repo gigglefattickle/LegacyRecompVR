@@ -58,8 +58,10 @@ else()
     add_compile_options(-ffp-model=strict)
 endif()
 
+if (NOT ANDROID)
+    add_compile_definitions(SDL_MAIN_HANDLED)
+endif()
 add_compile_definitions(
-    SDL_MAIN_HANDLED
     _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR # Microsoft wtf?
     _CRT_SECURE_NO_WARNINGS)
 
@@ -93,6 +95,15 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
         "os/linux/process_linux.cpp"
         "os/linux/user_linux.cpp"
         "os/linux/version_linux.cpp"
+    )
+elseif (ANDROID)
+    set(UNLEASHED_RECOMP_OS_CXX_SOURCES
+        "os/android/logger_android.cpp"
+        "os/android/media_android.cpp"
+        "os/android/process_android.cpp"
+        "os/android/user_android.cpp"
+        "os/android/version_android.cpp"
+        "os/android/storage_android.cpp"
     )
 endif()
 
@@ -178,6 +189,7 @@ set(UNLEASHED_RECOMP_CXX_SOURCES
     "sdl_listener.cpp"
     "stdafx.cpp"
     "version.cpp"
+    "vr/locomotion.cpp"
 
     ${UNLEASHED_RECOMP_KERNEL_CXX_SOURCES}
     ${UNLEASHED_RECOMP_OS_CXX_SOURCES}
@@ -237,6 +249,9 @@ if (WIN32)
     if (${CMAKE_BUILD_TYPE} MATCHES "Release")
         target_link_options(LegacyRecomp PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
     endif()
+elseif (ANDROID)
+    add_library(LegacyRecomp SHARED ${UNLEASHED_RECOMP_CXX_SOURCES})
+    target_compile_definitions(LegacyRecomp PRIVATE SDL_VULKAN_ENABLED)
 else()
     add_executable(LegacyRecomp ${UNLEASHED_RECOMP_CXX_SOURCES})
 endif()
@@ -262,7 +277,29 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_compile_definitions(LegacyRecomp PRIVATE SDL_VULKAN_ENABLED)
 endif()
 
-find_package(directx-dxc REQUIRED)
+# DXC is a host tool used to compile SPIR-V shaders during Android builds.
+# Do not resolve a target-ABI CMake package for this host executable.
+if (ANDROID)
+    # In manifest mode vcpkg installs host tools beside the Android build tree:
+    # <build>/vcpkg_installed/<host-triplet>/tools/directx-dxc/dxc.
+    # VCPKG_INSTALLED_DIR is not guaranteed to be populated as a CMake variable
+    # in every vcpkg version, so include the build-tree location explicitly.
+    find_program(DIRECTX_DXC_TOOL
+        NAMES dxc
+        HINTS
+            # vcpkg port logs show the host executable in this package staging directory.
+            "$ENV{VCPKG_ROOT}/packages/directx-dxc_x64-linux/tools/directx-dxc"
+            "$ENV{VCPKG_ROOT}/packages/directx-dxc_${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/directx-dxc"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "$ENV{VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+            "${VCPKG_ROOT}/installed/${VCPKG_HOST_TRIPLET}/tools/directx-dxc"
+        REQUIRED
+    )
+else()
+    find_package(directx-dxc REQUIRED)
+endif()
 find_package(CURL REQUIRED)
 
 if (UNLEASHED_RECOMP_D3D12)
@@ -300,11 +337,21 @@ if (WIN32)
     )
 endif()
 
+if (ANDROID)
+    find_library(ANDROID_LIBRARY android REQUIRED)
+    find_library(ANDROID_LOG_LIBRARY log REQUIRED)
+    find_library(ANDROID_VULKAN_LIBRARY vulkan REQUIRED)
+    target_link_libraries(LegacyRecomp PRIVATE
+        ${ANDROID_LIBRARY}
+        ${ANDROID_LOG_LIBRARY}
+        ${ANDROID_VULKAN_LIBRARY}
+    )
+endif()
+
 target_link_libraries(LegacyRecomp PRIVATE
     fmt::fmt
     libzstd_static
     msdf-atlas-gen::msdf-atlas-gen
-    nfd::nfd
     o1heap
     XenonUtils
     SDL2::SDL2-static
@@ -314,6 +361,14 @@ target_link_libraries(LegacyRecomp PRIVATE
     xxHash::xxhash
     CURL::libcurl
 )
+
+if (NOT ANDROID)
+    target_link_libraries(LegacyRecomp PRIVATE nfd::nfd)
+else()
+    # Native File Dialog Extended supports desktop platforms only. Android uses
+    # the platform document picker integration instead of GTK/Win32 dialogs.
+    target_include_directories(LegacyRecomp PRIVATE "${UNLEASHED_RECOMP_THIRDPARTY_ROOT}/nativefiledialog-extended/src/include")
+endif()
 
 target_include_directories(LegacyRecomp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
