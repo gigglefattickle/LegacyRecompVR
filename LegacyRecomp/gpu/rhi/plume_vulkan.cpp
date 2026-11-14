@@ -44,13 +44,15 @@ namespace plume {
     // Required extensions.
 
     static const std::unordered_set<std::string> RequiredInstanceExtensions = {
+#   if !defined(UNLEASHED_RECOMP_OPENXR)
         VK_KHR_SURFACE_EXTENSION_NAME,
-#   if defined(_WIN64)
+#       if defined(_WIN64)
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#   elif defined(__ANDROID__)
+#       elif defined(__ANDROID__)
         VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
-#   elif defined(__linux__)
+#       elif defined(__linux__)
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#       endif
 #   endif
     };
 
@@ -971,6 +973,30 @@ namespace plume {
 
         this->device = device;
         vk = image;
+    }
+
+    VulkanTexture::VulkanTexture(VulkanDevice *device, VkImage image, VkFormat format, uint32_t width, uint32_t height) {
+        assert(device != nullptr);
+        assert(image != VK_NULL_HANDLE);
+        assert(width > 0 && height > 0);
+
+        this->device = device;
+        vk = image;
+        ownership = false;
+        imageFormat = format;
+
+        RenderFormat renderFormat = RenderFormat::UNKNOWN;
+        if (format == VK_FORMAT_R8G8B8A8_UNORM)
+            renderFormat = RenderFormat::R8G8B8A8_UNORM;
+        else if (format == VK_FORMAT_B8G8R8A8_UNORM)
+            renderFormat = RenderFormat::B8G8R8A8_UNORM;
+
+        if (renderFormat == RenderFormat::UNKNOWN)
+            return;
+
+        desc = RenderTextureDesc::ColorTarget(width, height, renderFormat);
+        fillSubresourceRange();
+        createImageView(format);
     }
 
     VulkanTexture::~VulkanTexture() {
@@ -3574,56 +3600,67 @@ namespace plume {
 
         this->renderInterface = renderInterface;
 
-        uint32_t deviceCount = 0;
-        vkEnumeratePhysicalDevices(renderInterface->instance, &deviceCount, nullptr);
-        if (deviceCount == 0) {
-            fprintf(stderr, "Unable to find devices that support Vulkan.\n");
-            return;
+        if (renderInterface->preferredPhysicalDevice != VK_NULL_HANDLE) {
+            physicalDevice = renderInterface->preferredPhysicalDevice;
+            VkPhysicalDeviceProperties deviceProperties = {};
+            vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+            description.name = deviceProperties.deviceName;
+            description.type = toDeviceType(deviceProperties.deviceType);
+            description.driverVersion = deviceProperties.driverVersion;
+            description.vendor = RenderDeviceVendor(deviceProperties.vendorID);
         }
-        
-        std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
-        vkEnumeratePhysicalDevices(renderInterface->instance, &deviceCount, physicalDevices.data());
-
-        uint32_t currentDeviceTypeScore = 0;
-        uint32_t deviceTypeScoreTable[] = {
-            0,  // VK_PHYSICAL_DEVICE_TYPE_OTHER
-            3,  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
-            4,  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-            2,  // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU
-            1   // VK_PHYSICAL_DEVICE_TYPE_CPU
-        };
-
-        for (uint32_t i = 0; i < deviceCount; i++) {
-            VkPhysicalDeviceProperties deviceProperties;
-            vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
-
-            uint32_t deviceTypeIndex = deviceProperties.deviceType;
-            if (deviceTypeIndex > 4) {
-                continue;
+        else {
+            uint32_t deviceCount = 0;
+            vkEnumeratePhysicalDevices(renderInterface->instance, &deviceCount, nullptr);
+            if (deviceCount == 0) {
+                fprintf(stderr, "Unable to find devices that support Vulkan.\n");
+                return;
             }
 
-            std::string deviceName(deviceProperties.deviceName);
-            uint32_t deviceTypeScore = deviceTypeScoreTable[deviceTypeIndex];
-            bool preferDeviceTypeScore = (deviceTypeScore > currentDeviceTypeScore);
-            bool preferUserChoice = preferredDeviceName == deviceName;
-            bool preferOption = preferDeviceTypeScore || preferUserChoice;
-            if (preferOption) {
-                physicalDevice = physicalDevices[i];
-                description.name = deviceName;
-                description.type = toDeviceType(deviceProperties.deviceType);
-                description.driverVersion = deviceProperties.driverVersion;
-                description.vendor = RenderDeviceVendor(deviceProperties.vendorID);
-                currentDeviceTypeScore = deviceTypeScore;
+            std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
+            vkEnumeratePhysicalDevices(renderInterface->instance, &deviceCount, physicalDevices.data());
 
-                if (preferUserChoice) {
-                    break;
+            uint32_t currentDeviceTypeScore = 0;
+            uint32_t deviceTypeScoreTable[] = {
+                0,  // VK_PHYSICAL_DEVICE_TYPE_OTHER
+                3,  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+                4,  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+                2,  // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU
+                1   // VK_PHYSICAL_DEVICE_TYPE_CPU
+            };
+
+            for (uint32_t i = 0; i < deviceCount; i++) {
+                VkPhysicalDeviceProperties deviceProperties;
+                vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+
+                uint32_t deviceTypeIndex = deviceProperties.deviceType;
+                if (deviceTypeIndex > 4) {
+                    continue;
+                }
+
+                std::string deviceName(deviceProperties.deviceName);
+                uint32_t deviceTypeScore = deviceTypeScoreTable[deviceTypeIndex];
+                bool preferDeviceTypeScore = (deviceTypeScore > currentDeviceTypeScore);
+                bool preferUserChoice = preferredDeviceName == deviceName;
+                bool preferOption = preferDeviceTypeScore || preferUserChoice;
+                if (preferOption) {
+                    physicalDevice = physicalDevices[i];
+                    description.name = deviceName;
+                    description.type = toDeviceType(deviceProperties.deviceType);
+                    description.driverVersion = deviceProperties.driverVersion;
+                    description.vendor = RenderDeviceVendor(deviceProperties.vendorID);
+                    currentDeviceTypeScore = deviceTypeScore;
+
+                    if (preferUserChoice) {
+                        break;
+                    }
                 }
             }
-        }
 
-        if (physicalDevice == VK_NULL_HANDLE) {
-            fprintf(stderr, "Unable to find a device with the required features.\n");
-            return;
+            if (physicalDevice == VK_NULL_HANDLE) {
+                fprintf(stderr, "Unable to find a device with the required features.\n");
+                return;
+            }
         }
 
         // Check for extensions.
@@ -3843,7 +3880,9 @@ namespace plume {
         createInfo.enabledExtensionCount = uint32_t(enabledExtensions.size());
         createInfo.pEnabledFeatures = &deviceFeatures.features;
 
-        VkResult res = vkCreateDevice(physicalDevice, &createInfo, nullptr, &vk);
+        VkResult res = renderInterface->deviceCreateCallback
+            ? renderInterface->deviceCreateCallback(physicalDevice, &createInfo, &vk)
+            : vkCreateDevice(physicalDevice, &createInfo, nullptr, &vk);
         if (res != VK_SUCCESS) {
             fprintf(stderr, "vkCreateDevice failed with error code 0x%X.\n", res);
             return;
@@ -4370,8 +4409,47 @@ namespace plume {
         }
     }
 
+    VulkanInterface::VulkanInterface(
+        VkInstance externalInstance,
+        VkPhysicalDevice requiredPhysicalDevice,
+        DeviceCreateCallback createDeviceCallback)
+    {
+        if (externalInstance == VK_NULL_HANDLE ||
+            requiredPhysicalDevice == VK_NULL_HANDLE || !createDeviceCallback)
+            return;
+
+        instance = externalInstance;
+        preferredPhysicalDevice = requiredPhysicalDevice;
+        deviceCreateCallback = std::move(createDeviceCallback);
+        ownsInstance = false;
+
+        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        appInfo.pApplicationName = "Legacy Recomp VR";
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.pEngineName = "Plume";
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.apiVersion = VK_API_VERSION_1_2;
+
+        volkLoadInstance(instance);
+
+        capabilities.shaderFormat = RenderShaderFormat::SPIRV;
+
+        uint32_t deviceCount = 0;
+        if (vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr) == VK_SUCCESS && deviceCount > 0) {
+            std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
+            if (vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data()) == VK_SUCCESS) {
+                for (uint32_t i = 0; i < deviceCount; i++) {
+                    VkPhysicalDeviceProperties deviceProperties = {};
+                    vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+                    if (physicalDevices[i] == preferredPhysicalDevice)
+                        deviceNames.emplace_back(deviceProperties.deviceName);
+                }
+            }
+        }
+    }
+
     VulkanInterface::~VulkanInterface() {
-        if (instance != nullptr) {
+        if (ownsInstance && instance != VK_NULL_HANDLE) {
             vkDestroyInstance(instance, nullptr);
         }
     }

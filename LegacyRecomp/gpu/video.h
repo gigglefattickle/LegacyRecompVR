@@ -5,6 +5,9 @@
 //#define PSO_CACHING_CLEANUP
 
 #include "rhi/plume_render_interface.h"
+#if defined(UNLEASHED_RECOMP_OPENXR)
+#include "quest/QuestOpenXR.h"
+#endif
 #include <cstdint>
 
 #define D3DCLEAR_TARGET  0x1
@@ -32,6 +35,10 @@ struct Video
     static void SetQuestEyeMatrix(uint32_t eye, const float* matrix16);
     static void SetQuestActiveEye(uint32_t eye);
     static void EndQuestEyeFrame();
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    static bool GetQuestEyeFrameData(uint32_t eye, quest::EyeFrameData& frameData);
+    static bool PrepareQuestEyeRenderTarget(uint32_t eye, RenderTexture*& texture, RenderFramebuffer*& framebuffer);
+#endif
     static std::string GetQuestCameraTracePath();
     static std::string ExportQuestCameraTrace();
 };

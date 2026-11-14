@@ -9,6 +9,7 @@
 
 #include "plume_render_interface.h"
 
+#include <functional>
 #include <mutex>
 #include <set>
 #include <unordered_map>
@@ -86,6 +87,7 @@ namespace plume {
         VulkanTexture() = default;
         VulkanTexture(VulkanDevice *device, VulkanPool *pool, const RenderTextureDesc &desc);
         VulkanTexture(VulkanDevice *device, VkImage image);
+        VulkanTexture(VulkanDevice *device, VkImage image, VkFormat format, uint32_t width, uint32_t height);
         ~VulkanTexture() override;
         void createImageView(VkFormat format);
         std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &desc) override;
@@ -436,7 +438,12 @@ namespace plume {
     };
 
     struct VulkanInterface : RenderInterface {
+        using DeviceCreateCallback = std::function<VkResult(VkPhysicalDevice, const VkDeviceCreateInfo*, VkDevice*)>;
+
         VkInstance instance = VK_NULL_HANDLE;
+        VkPhysicalDevice preferredPhysicalDevice = VK_NULL_HANDLE;
+        DeviceCreateCallback deviceCreateCallback;
+        bool ownsInstance = true;
         VkApplicationInfo appInfo = {};
         RenderInterfaceCapabilities capabilities;
         std::vector<std::string> deviceNames;
@@ -447,6 +454,7 @@ namespace plume {
         VulkanInterface();
 #   endif
 
+        VulkanInterface(VkInstance externalInstance, VkPhysicalDevice requiredPhysicalDevice, DeviceCreateCallback createDeviceCallback);
         ~VulkanInterface() override;
         std::unique_ptr<RenderDevice> createDevice(const std::string &preferredDeviceName) override;
         const RenderInterfaceCapabilities &getCapabilities() const override;

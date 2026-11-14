@@ -201,6 +201,11 @@ void GameWindow::Init(const char* sdlVideoDriver)
 
     SDL_SetWindowMinimumSize(s_pWindow, MIN_WIDTH, MIN_HEIGHT);
 
+#if defined(__ANDROID__)
+    // OpenXR owns the headset swapchains; the SDL window is retained only for
+    // SDL event delivery and the existing ImGui platform backend.
+    s_renderWindow = nullptr;
+#else
     SDL_SysWMinfo info;
     SDL_VERSION(&info.version);
     SDL_GetWindowWMInfo(s_pWindow, &info);
@@ -220,6 +225,7 @@ void GameWindow::Init(const char* sdlVideoDriver)
 #else
     static_assert(false, "Unknown platform.");
 #endif
+#endif // !__ANDROID__
 
     SetTitleBarColour();
 

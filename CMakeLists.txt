@@ -18,10 +18,10 @@ endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-# Target Sandy Bridge for all projects
-add_compile_options(
-    -march=sandybridge
-)
+# Sandy Bridge tuning is only valid for x86 targets. Quest builds use ARM64.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+    add_compile_options(-march=sandybridge)
+endif()
 
 add_subdirectory(${UNLEASHED_RECOMP_THIRDPARTY_ROOT})
 add_subdirectory(${UNLEASHED_RECOMP_TOOLS_ROOT})

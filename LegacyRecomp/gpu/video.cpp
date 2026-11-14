@@ -1,6 +1,12 @@
 #include "video.h"
 #include "quest/QuestCameraUniformBridge.h"
+#if defined(UNLEASHED_RECOMP_OPENXR)
+#include "quest/QuestOpenXR.h"
+#include "rhi/plume_vulkan.h"
+#endif
 #include <algorithm>
+#include <array>
+#include <vector>
 #include <filesystem>
 #include <system_error>
 
@@ -215,6 +221,11 @@ struct DirtyStates
 
 static DirtyStates g_dirtyStates(true);
 static QuestCameraUniformBridge g_questCameraUniformBridge;
+#if defined(UNLEASHED_RECOMP_OPENXR)
+static quest::OpenXRRuntime& g_questOpenXR = quest::GetOpenXRRuntime();
+static std::array<std::vector<std::unique_ptr<plume::VulkanTexture>>, 2> g_questEyeTextures;
+static std::array<std::vector<std::unique_ptr<RenderFramebuffer>>, 2> g_questEyeFramebuffers;
+#endif
 
 void Video::BeginQuestEyeFrame(uint64_t frameSerial)
 {
@@ -246,6 +257,64 @@ void Video::EndQuestEyeFrame()
 {
     g_questCameraUniformBridge.ClearEye();
 }
+
+#if defined(UNLEASHED_RECOMP_OPENXR)
+bool Video::GetQuestEyeFrameData(uint32_t eye, quest::EyeFrameData& frameData)
+{
+    return g_questOpenXR.GetEyeFrameData(eye, frameData);
+}
+
+bool Video::PrepareQuestEyeRenderTarget(uint32_t eye, RenderTexture*& texture, RenderFramebuffer*& framebuffer)
+{
+    texture = nullptr;
+    framebuffer = nullptr;
+
+    quest::EyeFrameData eyeData;
+    if (eye >= 2 || !g_device || !g_questOpenXR.GetEyeFrameData(eye, eyeData))
+        return false;
+
+    if (eyeData.format != VK_FORMAT_R8G8B8A8_UNORM &&
+        eyeData.format != VK_FORMAT_B8G8R8A8_UNORM)
+        return false;
+
+    auto* vkDevice = static_cast<plume::VulkanDevice*>(g_device.get());
+    auto& textures = g_questEyeTextures[eye];
+    auto& framebuffers = g_questEyeFramebuffers[eye];
+    const size_t imageIndex = eyeData.imageIndex;
+    if (textures.size() <= imageIndex)
+    {
+        textures.resize(imageIndex + 1);
+        framebuffers.resize(imageIndex + 1);
+    }
+
+    if (!textures[imageIndex] || textures[imageIndex]->vk != eyeData.image)
+    {
+        framebuffers[imageIndex].reset();
+        textures[imageIndex] = std::make_unique<plume::VulkanTexture>(
+            vkDevice, eyeData.image, eyeData.format, eyeData.width, eyeData.height);
+        if (textures[imageIndex]->imageView == VK_NULL_HANDLE)
+        {
+            textures[imageIndex].reset();
+            return false;
+        }
+
+        const RenderTexture* colorAttachment = textures[imageIndex].get();
+        RenderFramebufferDesc desc;
+        desc.colorAttachments = &colorAttachment;
+        desc.colorAttachmentsCount = 1;
+        framebuffers[imageIndex] = g_device->createFramebuffer(desc);
+        if (!framebuffers[imageIndex])
+        {
+            textures[imageIndex].reset();
+            return false;
+        }
+    }
+
+    texture = textures[imageIndex].get();
+    framebuffer = framebuffers[imageIndex].get();
+    return true;
+}
+#endif
 
 std::string Video::GetQuestCameraTracePath()
 {
@@ -1737,6 +1806,39 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
 
     GameWindow::Init(sdlVideoDriver);
 
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    if (!g_questOpenXR.Initialize())
+        return false;
+
+    auto xrInterface = std::make_unique<plume::VulkanInterface>(
+        g_questOpenXR.GetVulkanInstance(),
+        g_questOpenXR.GetVulkanPhysicalDevice(),
+        g_questOpenXR.GetDeviceCreateCallback());
+    if (!xrInterface->isValid())
+    {
+        g_questOpenXR.Shutdown();
+        return false;
+    }
+
+    g_interface = std::move(xrInterface);
+    g_device = g_interface->createDevice();
+    if (!g_device)
+    {
+        g_questOpenXR.Shutdown();
+        return false;
+    }
+
+    auto* xrPlumeDevice = static_cast<plume::VulkanDevice*>(g_device.get());
+    constexpr uint32_t DIRECT_QUEUE_FAMILY_INDEX = 0;
+    if (!g_questOpenXR.CreateSession(
+        xrPlumeDevice->vk,
+        xrPlumeDevice->queueFamilyIndices[DIRECT_QUEUE_FAMILY_INDEX],
+        0))
+    {
+        g_questOpenXR.Shutdown();
+        return false;
+    }
+#else
 
 //
 // TODO fix
@@ -1866,6 +1968,7 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
     {
         return false;
     }
+#endif // !UNLEASHED_RECOMP_OPENXR
 
 #ifdef UNLEASHED_RECOMP_D3D12
     if (graphicsApiRetry)
@@ -1957,12 +2060,19 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
         bufferCount = 3;
     }
 
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    // The OpenXR runtime owns the per-eye swapchains. Keep Plume on a correctly
+    // sized offscreen target until the two-eye command-list replay is connected.
+    g_swapChain.reset();
+    g_swapChainValid = false;
+#else
     //g_swapChain = g_queue->createSwapChain(GameWindow::s_renderWindow, bufferCount, BACKBUFFER_FORMAT, Config::MaxFrameLatency);
     g_swapChain = g_queue->createSwapChain(GameWindow::s_renderWindow, bufferCount, BACKBUFFER_FORMAT, 2);
 
     //g_swapChain->setVsyncEnabled(Config::VSync);
     g_swapChain->setVsyncEnabled(false);
     g_swapChainValid = !g_swapChain->needsResize();
+#endif
 
     for (auto& acquireSemaphore : g_acquireSemaphores)
         acquireSemaphore = g_device->createCommandSemaphore();
@@ -2139,10 +2249,19 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
     g_backBuffer->width = 1280;
     g_backBuffer->height = 720;
     g_backBuffer->format = BACKBUFFER_FORMAT;
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    Video::s_viewportWidth = 1280;
+    Video::s_viewportHeight = 720;
+    g_backBuffer->textureHolder = g_device->createTexture(
+        RenderTextureDesc::Texture2D(Video::s_viewportWidth, Video::s_viewportHeight, 1,
+            BACKBUFFER_FORMAT, RenderTextureFlag::RENDER_TARGET));
+    g_backBuffer->texture = g_backBuffer->textureHolder.get();
+    g_needsResize = false;
+#else
     g_backBuffer->textureHolder = g_device->createTexture(RenderTextureDesc::Texture2D(1, 1, 1, BACKBUFFER_FORMAT, RenderTextureFlag::RENDER_TARGET));
-
     Video::ComputeViewportDimensions();
     CheckSwapChain();
+#endif
     BeginCommandList();
 
     RenderTextureBarrier blankTextureBarriers[TEXTURE_DESCRIPTOR_NULL_COUNT];
@@ -2659,8 +2778,12 @@ static void DrawImGui()
     // ImGui doesn't know that we center the screen for specific aspect ratio
     // settings, which causes mouse events to not work correctly. To fix this, 
     // we can adjust the mouse events before ImGui processes them.
-    uint32_t width = g_swapChain->getWidth();
-    uint32_t height = g_swapChain->getHeight();
+    uint32_t width = g_swapChain
+        ? g_swapChain->getWidth()
+        : std::max<uint32_t>(Video::s_viewportWidth, 1);
+    uint32_t height = g_swapChain
+        ? g_swapChain->getHeight()
+        : std::max<uint32_t>(Video::s_viewportHeight, 1);
     float mousePosScaleX = float(width) / float(GameWindow::s_width);
     float mousePosScaleY = float(height) / float(GameWindow::s_height);
     float mousePosOffsetX = (width - Video::s_viewportWidth) / 2.0f;
@@ -2683,6 +2806,20 @@ static void DrawImGui()
             //}
         }
     }
+
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    const quest::UiPointer questPointer = g_questOpenXR.GetUiPointer();
+    if (questPointer.valid)
+    {
+        io.AddMousePosEvent(questPointer.x, questPointer.y);
+        io.AddMouseButtonEvent(0, questPointer.primaryDown);
+    }
+    else
+    {
+        io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        io.AddMouseButtonEvent(0, false);
+    }
+#endif
 
     ImGui::NewFrame();
 
@@ -2919,9 +3056,16 @@ void Video::WaitOnSwapChain()
 static bool g_shouldPrecompilePipelines;
 static std::atomic<bool> g_executedCommandList;
 
-void Video::Present() 
+void Video::Present()
 {
     g_readyForCommands = false;
+
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    // Service the runtime every application present. BeginFrame updates both
+    // eye views and Touch input before the in-game ImGui pointer is generated.
+    g_questOpenXR.PollEvents();
+    g_questOpenXR.BeginFrame();
+#endif
 
     RenderCommand cmd;
     cmd.type = RenderCommandType::ExecutePendingStretchRectCommands;
@@ -2979,7 +3123,9 @@ void Video::Present()
     g_triangleFanIndexData.reset();
     g_quadIndexData.reset();
 
+#if !defined(UNLEASHED_RECOMP_OPENXR)
     CheckSwapChain();
+#endif
 
     cmd.type = RenderCommandType::BeginCommandList;
     g_renderQueue.enqueue(cmd);
@@ -3006,6 +3152,13 @@ void Video::Present()
     //
     //    s_next += 1000000000ns / Config::FPS;
     //}
+
+#if defined(UNLEASHED_RECOMP_OPENXR)
+    // Until Plume renders into the acquired OpenXR images, intentionally submit
+    // an empty frame rather than showing uninitialized swapchain contents.
+    if (g_questOpenXR.IsFrameBegun())
+        g_questOpenXR.EndFrame(false);
+#endif
 
     g_presentProfiler.Reset();
 }

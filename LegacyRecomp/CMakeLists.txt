@@ -109,6 +109,12 @@ set(UNLEASHED_RECOMP_GPU_CXX_SOURCES
     "gpu/rhi/plume_vulkan.cpp"
 )
 
+if (ANDROID)
+    list(APPEND UNLEASHED_RECOMP_GPU_CXX_SOURCES
+        "gpu/quest/QuestOpenXR.cpp"
+    )
+endif()
+
 if (UNLEASHED_RECOMP_D3D12)
     list(APPEND UNLEASHED_RECOMP_GPU_CXX_SOURCES
         "gpu/rhi/plume_d3d12.cpp"
@@ -265,6 +271,19 @@ endif()
 
 find_package(directx-dxc REQUIRED)
 find_package(CURL REQUIRED)
+
+if (ANDROID)
+    # The Khronos Android loader is supplied by the Gradle Prefab dependency:
+    # org.khronos.openxr:openxr_loader_for_android:1.1.65
+    find_package(OpenXR CONFIG REQUIRED)
+    find_library(ANDROID_LOG_LIBRARY log REQUIRED)
+    target_compile_definitions(LegacyRecomp PRIVATE
+        UNLEASHED_RECOMP_OPENXR
+        XR_USE_PLATFORM_ANDROID
+        XR_USE_GRAPHICS_API_VULKAN
+    )
+    target_link_libraries(LegacyRecomp PRIVATE OpenXR::openxr_loader ${ANDROID_LOG_LIBRARY} android)
+endif()
 
 if (UNLEASHED_RECOMP_D3D12)
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/D3D12)
