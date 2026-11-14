@@ -441,6 +441,7 @@ namespace quest
 
         swapchain.width = width;
         swapchain.height = height;
+        swapchain.format = selectedFormat;
 
         uint32_t imageCount = 0;
         result = xrEnumerateSwapchainImages(swapchain.handle, 0, &imageCount, nullptr);
@@ -856,6 +857,7 @@ namespace quest
             return false;
 
         frameData.image = swapchain.images[swapchain.imageIndex].image;
+        frameData.format = swapchain.format;
         frameData.swapchain = swapchain.handle;
         frameData.view = m_views[eye];
         frameData.width = swapchain.width;
