@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <fstream>
+#include <string>
 #include <utility>
 
 class QuestCameraUniformBridge {
@@ -21,6 +23,7 @@ public:
     void DisableMatrixOverride();
     void SetEyeMatrix(Eye eye, const Matrix4& matrix);
     void SetObservers(GuestWriteObserver writes, DrawObserver draws);
+    std::string TracePath();
     class DrawScope {
     public:
         DrawScope()=default;
@@ -46,6 +49,12 @@ public:
 private:
     friend class DrawScope;
     void RestoreDraw(uint32_t*,size_t,uint32_t,const std::array<uint32_t,16>&);
+    void EnsureTraceOpen();
+    void TraceDraw(uintptr_t, const uint32_t*, size_t);
+    std::ofstream m_trace;
+    std::string m_tracePath;
+    std::array<bool,256> m_dirtyRegisters{};
+    uint64_t m_traceEventCount=0;
     uint64_t m_frameSerial=0, m_writeSerial=0;
     Eye m_eye=Eye::Left;
     bool m_eyeActive=false, m_matrixRegisterConfigured=false;
