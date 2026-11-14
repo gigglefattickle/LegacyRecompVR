@@ -37,6 +37,7 @@ struct Video
     static void EndQuestEyeFrame();
 #if defined(UNLEASHED_RECOMP_OPENXR)
     static bool GetQuestEyeFrameData(uint32_t eye, quest::EyeFrameData& frameData);
+    static bool PrepareQuestEyeRenderTarget(uint32_t eye, RenderTexture*& texture, RenderFramebuffer*& framebuffer);
 #endif
     static std::string GetQuestCameraTracePath();
     static std::string ExportQuestCameraTrace();
