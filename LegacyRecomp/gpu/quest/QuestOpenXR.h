@@ -29,6 +29,7 @@ namespace quest
     struct EyeFrameData
     {
         VkImage image = VK_NULL_HANDLE;
+        VkFormat format = VK_FORMAT_UNDEFINED;
         XrSwapchain swapchain = XR_NULL_HANDLE;
         XrView view{ XR_TYPE_VIEW };
         uint32_t width = 0;
@@ -87,6 +88,7 @@ namespace quest
             XrSwapchain handle = XR_NULL_HANDLE;
             uint32_t width = 0;
             uint32_t height = 0;
+            VkFormat format = VK_FORMAT_UNDEFINED;
             uint32_t imageIndex = 0;
             bool acquired = false;
             std::vector<XrSwapchainImageVulkan2KHR> images;
