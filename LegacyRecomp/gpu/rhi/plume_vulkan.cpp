@@ -975,6 +975,30 @@ namespace plume {
         vk = image;
     }
 
+    VulkanTexture::VulkanTexture(VulkanDevice *device, VkImage image, VkFormat format, uint32_t width, uint32_t height) {
+        assert(device != nullptr);
+        assert(image != VK_NULL_HANDLE);
+        assert(width > 0 && height > 0);
+
+        this->device = device;
+        vk = image;
+        ownership = false;
+        imageFormat = format;
+
+        RenderFormat renderFormat = RenderFormat::UNKNOWN;
+        if (format == VK_FORMAT_R8G8B8A8_UNORM)
+            renderFormat = RenderFormat::R8G8B8A8_UNORM;
+        else if (format == VK_FORMAT_B8G8R8A8_UNORM)
+            renderFormat = RenderFormat::B8G8R8A8_UNORM;
+
+        if (renderFormat == RenderFormat::UNKNOWN)
+            return;
+
+        desc = RenderTextureDesc::ColorTarget(width, height, renderFormat);
+        fillSubresourceRange();
+        createImageView(format);
+    }
+
     VulkanTexture::~VulkanTexture() {
         if (imageView != VK_NULL_HANDLE) {
             vkDestroyImageView(device->vk, imageView, nullptr);
