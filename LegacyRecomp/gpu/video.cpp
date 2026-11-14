@@ -1761,7 +1761,7 @@ bool Video::CreateHostDevice(const char *sdlVideoDriver, bool graphicsApiRetry)
         return false;
 
     auto* xrPlumeDevice = static_cast<plume::VulkanDevice*>(g_device.get());
-    constexpr uint32_t DIRECT_QUEUE_FAMILY_INDEX = 1;
+    constexpr uint32_t DIRECT_QUEUE_FAMILY_INDEX = 0;
     if (!g_questOpenXR.CreateSession(
         xrPlumeDevice->vk,
         xrPlumeDevice->queueFamilyIndices[DIRECT_QUEUE_FAMILY_INDEX],
