@@ -86,6 +86,14 @@ if (WIN32)
         "os/win32/user_win32.cpp"
         "os/win32/version_win32.cpp"
     )
+elseif (ANDROID)
+    set(UNLEASHED_RECOMP_OS_CXX_SOURCES
+        "os/android/logger_android.cpp"
+        "os/android/media_android.cpp"
+        "os/android/process_android.cpp"
+        "os/android/user_android.cpp"
+        "os/android/version_android.cpp"
+    )
 elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(UNLEASHED_RECOMP_OS_CXX_SOURCES
         "os/linux/logger_linux.cpp"
