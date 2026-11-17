@@ -1,5 +1,7 @@
 #include <stdafx.h>
+#if defined(__x86_64__)
 #include <cpuid.h>
+#endif
 #include <cpu/guest_thread.h>
 #include <gpu/video.h>
 #include <kernel/function.h>
