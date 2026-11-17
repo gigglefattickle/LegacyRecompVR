@@ -11,6 +11,8 @@ using Microsoft::WRL::ComPtr;
 #elif defined(__linux__)
 #include <unistd.h>
 #include <pwd.h>
+#elif defined(__ANDROID__)
+#include <unistd.h>
 #endif
 
 #ifdef UNLEASHED_RECOMP_D3D12
